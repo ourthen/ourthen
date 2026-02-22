@@ -87,4 +87,20 @@ describe("CircleHomeScreen", () => {
       expect(screen.getAllByText("우리 동네 팀").length).toBeGreaterThan(0);
     });
   });
+
+  it("hides invite code generation controls for non-admin members", async () => {
+    const service = createServiceMock();
+    service.fetchMyCircles.mockResolvedValue([{ id: "c1", name: "동네 친구", role: "member" }]);
+    service.fetchMeetupsByCircle.mockResolvedValue([]);
+    service.fetchPiecesByCircle.mockResolvedValue([]);
+
+    render(<CircleHomeScreen userId="user-1" service={service} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("동네 친구").length).toBeGreaterThan(0);
+      expect(screen.getByText("현재 계정은 멤버 권한이라 초대 코드를 만들 수 없어요.")).toBeTruthy();
+    });
+
+    expect(screen.queryByText("이 모임 초대 코드 만들기")).toBeNull();
+  });
 });

@@ -4,6 +4,7 @@ import {
   Keyboard,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -192,6 +193,24 @@ export function CircleHomeScreen({
     }
   };
 
+  const handleShareInviteCode = async () => {
+    if (!selectedCircle || !inviteCode) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setErrorMessage("");
+      await Share.share({
+        message: `[우리그때] ${selectedCircle.name} 초대 코드: ${inviteCode}\n앱에서 코드로 참여해 주세요.`,
+      });
+    } catch (error) {
+      setErrorMessage(messageFromError(error, "초대 코드 공유에 실패했어요."));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleCreateMeetup = async () => {
     if (!selectedCircleId) {
       return;
@@ -353,7 +372,19 @@ export function CircleHomeScreen({
           <>
             <View style={styles.sectionCard}>
               <Text style={styles.sectionLabel}>내 모임</Text>
-              <Text style={styles.circleTitle}>{selectedCircle.name}</Text>
+              <View style={styles.circleTitleRow}>
+                <Text style={styles.circleTitle}>{selectedCircle.name}</Text>
+                <View
+                  style={[
+                    styles.roleBadge,
+                    selectedCircle.role === "admin" ? styles.roleBadgeAdmin : styles.roleBadgeMember,
+                  ]}
+                >
+                  <Text style={styles.roleBadgeText}>
+                    {selectedCircle.role === "admin" ? "관리자" : "멤버"}
+                  </Text>
+                </View>
+              </View>
               <View style={styles.circleChipRow}>
                 {circles.map((circle) => (
                   <Pressable
@@ -384,15 +415,34 @@ export function CircleHomeScreen({
               <Text style={styles.mutedText}>
                 초대 코드를 만들어 전달하거나, 받은 코드를 입력해 다른 모임에 참여할 수 있어요.
               </Text>
-              {inviteCode ? <Text style={styles.inviteCodeText}>{inviteCode}</Text> : null}
-              <Pressable
-                onPress={handleCreateInviteCode}
-                style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
-              >
-                <Text style={styles.actionButtonText}>
-                  {isSaving ? "생성 중..." : "이 모임 초대 코드 만들기"}
-                </Text>
-              </Pressable>
+              {selectedCircle.role === "admin" ? (
+                <>
+                  {inviteCode ? <Text style={styles.inviteCodeText}>{inviteCode}</Text> : null}
+                  <Pressable
+                    onPress={handleCreateInviteCode}
+                    style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
+                  >
+                    <Text style={styles.actionButtonText}>
+                      {isSaving ? "생성 중..." : "이 모임 초대 코드 만들기"}
+                    </Text>
+                  </Pressable>
+                  {inviteCode ? (
+                    <Pressable
+                      onPress={handleShareInviteCode}
+                      style={({ pressed }) => [
+                        styles.secondaryButton,
+                        pressed && styles.secondaryButtonPressed,
+                      ]}
+                    >
+                      <Text style={styles.secondaryButtonText}>
+                        {isSaving ? "공유 중..." : "초대 코드 공유하기"}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </>
+              ) : (
+                <Text style={styles.mutedText}>현재 계정은 멤버 권한이라 초대 코드를 만들 수 없어요.</Text>
+              )}
               <TextInput
                 autoCapitalize="characters"
                 onChangeText={setJoinCode}
@@ -624,6 +674,22 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "700",
   },
+  secondaryButton: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  secondaryButtonPressed: {
+    opacity: 0.75,
+  },
+  secondaryButtonText: {
+    color: colors.textPrimary,
+    fontWeight: "700",
+  },
   inviteCodeText: {
     color: colors.textPrimary,
     fontSize: 24,
@@ -634,6 +700,31 @@ const styles = StyleSheet.create({
   circleTitle: {
     color: colors.textPrimary,
     fontSize: 21,
+    fontWeight: "700",
+  },
+  circleTitleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  roleBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  roleBadgeAdmin: {
+    backgroundColor: "#fff3dc",
+    borderColor: "#f0d99a",
+    borderWidth: 1,
+  },
+  roleBadgeMember: {
+    backgroundColor: "#ebf4ff",
+    borderColor: "#b7d5fb",
+    borderWidth: 1,
+  },
+  roleBadgeText: {
+    color: colors.textPrimary,
+    fontSize: 12,
     fontWeight: "700",
   },
   circleChipRow: {
