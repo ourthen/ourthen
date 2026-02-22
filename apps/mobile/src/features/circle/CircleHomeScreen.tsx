@@ -57,15 +57,16 @@ type BusyAction =
   | "create_meetup"
   | "create_piece";
 
-type HomeView = "members" | "pieces" | "meetup" | "invite" | "feed";
-
-const HOME_VIEW_TABS: Array<{ key: HomeView; label: string }> = [
-  { key: "members", label: "모임" },
-  { key: "pieces", label: "기억" },
-  { key: "meetup", label: "일정" },
-  { key: "invite", label: "초대" },
-  { key: "feed", label: "피드" },
-];
+type HomeView =
+  | "feed"
+  | "menu"
+  | "members"
+  | "create_circle"
+  | "join_circle"
+  | "pieces"
+  | "meetup"
+  | "meetup_create"
+  | "invite";
 
 function normalizeInviteCode(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
@@ -100,6 +101,36 @@ function messageFromError(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function formatMeetupScheduleLabel(value: string | null): string {
+  if (!value) {
+    return "일정 시간 미정";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "일정 시간 미정";
+  }
+  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes(),
+  ).padStart(2, "0")}`;
+}
+
+function buildScheduledAt(dateInput: string, timeInput: string): string | null {
+  const datePart = dateInput.trim();
+  const timePart = timeInput.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+    return null;
+  }
+  if (!/^\d{2}:\d{2}$/.test(timePart)) {
+    return null;
+  }
+
+  const date = new Date(`${datePart}T${timePart}:00`);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toISOString();
+}
+
 export function CircleHomeScreen({
   userId,
   service = defaultService,
@@ -115,8 +146,10 @@ export function CircleHomeScreen({
   const [joinCode, setJoinCode] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [meetupTitle, setMeetupTitle] = useState("");
+  const [meetupDateInput, setMeetupDateInput] = useState("");
+  const [meetupTimeInput, setMeetupTimeInput] = useState("");
   const [pieceBody, setPieceBody] = useState("");
-  const [activeView, setActiveView] = useState<HomeView>("members");
+  const [activeView, setActiveView] = useState<HomeView>("feed");
   const [emptyStateMode, setEmptyStateMode] = useState<"create" | "join">("create");
   const [isLoading, setIsLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<BusyAction | null>(null);
@@ -128,6 +161,7 @@ export function CircleHomeScreen({
   const [showFirstPieceNudge, setShowFirstPieceNudge] = useState(false);
   const [isInviteRotateConfirming, setIsInviteRotateConfirming] = useState(false);
   const pieceInputRef = useRef<TextInput | null>(null);
+  const contentLoadRequestIdRef = useRef(0);
 
   const selectedCircle = useMemo(
     () => circles.find((circle) => circle.id === selectedCircleId) ?? null,
@@ -155,14 +189,51 @@ export function CircleHomeScreen({
     (action: BusyAction) => busyAction === action,
     [busyAction],
   );
+  const viewTitle = useMemo(() => {
+    if (!selectedCircle) {
+      return "우리그때";
+    }
+    switch (activeView) {
+      case "feed":
+        return `${selectedCircle.name} 피드`;
+      case "menu":
+        return "기능 선택";
+      case "members":
+        return "모임 관리";
+      case "create_circle":
+        return "모임 만들기";
+      case "join_circle":
+        return "코드로 참여";
+      case "pieces":
+        return "기억 남기기";
+      case "meetup":
+        return "모임 일정";
+      case "meetup_create":
+        return "일정 만들기";
+      case "invite":
+        return "초대 코드";
+      default:
+        return "우리그때";
+    }
+  }, [activeView, selectedCircle]);
 
   const loadCircleContent = useCallback(
     async (circleId: string) => {
+      const requestId = contentLoadRequestIdRef.current + 1;
+      contentLoadRequestIdRef.current = requestId;
       const [nextMeetups, nextMembers, nextPieces] = await Promise.all([
         service.fetchMeetupsByCircle(circleId),
         service.fetchCircleMembers(circleId),
         service.fetchPiecesByCircle(circleId),
       ]);
+
+      if (contentLoadRequestIdRef.current !== requestId) {
+        return {
+          meetups: nextMeetups,
+          members: nextMembers,
+          pieces: nextPieces,
+        };
+      }
 
       setMeetups(nextMeetups);
       setMembers(nextMembers);
@@ -173,7 +244,7 @@ export function CircleHomeScreen({
         pieces: nextPieces,
       };
     },
-    [service],
+    [service, contentLoadRequestIdRef],
   );
 
   const loadInitialData = useCallback(async () => {
@@ -187,6 +258,9 @@ export function CircleHomeScreen({
       setSelectedCircleId(nextCircleId);
 
       if (nextCircleId) {
+        setMeetups([]);
+        setMembers([]);
+        setPieces([]);
         await loadCircleContent(nextCircleId);
       } else {
         setMeetups([]);
@@ -250,6 +324,9 @@ export function CircleHomeScreen({
     setIsInviteRotateConfirming(false);
     setShowFirstPieceNudge(false);
     setSelectedCircleId(circleId);
+    setMeetups([]);
+    setMembers([]);
+    setPieces([]);
     try {
       setErrorMessage("");
       await loadCircleContent(circleId);
@@ -268,8 +345,12 @@ export function CircleHomeScreen({
       const created = await service.createCircleWithMembership(circleName);
       setCircleName("");
       setInviteCode("");
+      setActiveView("feed");
       setCircles((prev) => [created, ...prev]);
       setSelectedCircleId(created.id);
+      setMeetups([]);
+      setMembers([]);
+      setPieces([]);
       await loadCircleContent(created.id);
       setSuccessMessage("모임을 만들었어요.");
     } catch (error) {
@@ -326,6 +407,9 @@ export function CircleHomeScreen({
       setIsInviteRotateConfirming(false);
       setCircles((prev) => [joinedCircle, ...prev.filter((row) => row.id !== joinedCircle.id)]);
       setSelectedCircleId(joinedCircle.id);
+      setMeetups([]);
+      setMembers([]);
+      setPieces([]);
       const circleContent = await loadCircleContent(joinedCircle.id);
       const shouldNudgeFirstPiece = circleContent.pieces.length === 0;
       setShowFirstPieceNudge(shouldNudgeFirstPiece);
@@ -375,9 +459,17 @@ export function CircleHomeScreen({
       setBusyAction("create_meetup");
       setErrorMessage("");
       setSuccessMessage("");
-      await service.createMeetup(selectedCircleId, userId, meetupTitle);
+      const scheduledAt = buildScheduledAt(meetupDateInput, meetupTimeInput);
+      if (!scheduledAt) {
+        throw new Error("날짜는 YYYY-MM-DD, 시간은 HH:MM 형식으로 입력해 주세요.");
+      }
+
+      await service.createMeetup(selectedCircleId, userId, meetupTitle, scheduledAt);
       setMeetupTitle("");
+      setMeetupDateInput("");
+      setMeetupTimeInput("");
       await loadCircleContent(selectedCircleId);
+      setActiveView("meetup");
       setSuccessMessage("모임 일정을 추가했어요.");
     } catch (error) {
       setSuccessMessage("");
@@ -401,6 +493,7 @@ export function CircleHomeScreen({
       await loadCircleContent(selectedCircleId);
       setFeedRefreshToken((prev) => prev + 1);
       setShowFirstPieceNudge(false);
+      setActiveView("feed");
       setSuccessMessage("기억 조각을 저장했어요.");
     } catch (error) {
       setSuccessMessage("");
@@ -475,8 +568,40 @@ export function CircleHomeScreen({
       <View style={[styles.content, { maxWidth: layout.contentMaxWidth }]}>
         <View style={styles.heroCard}>
           <View style={styles.heroTopRow}>
-            <Text style={styles.heroTitle}>우리그때 홈</Text>
+            <Text style={styles.heroTitle}>{viewTitle}</Text>
             <View style={styles.heroActionRow}>
+              {selectedCircle && activeView !== "feed" ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isBusy}
+                  onPress={() => {
+                    setActiveView("feed");
+                  }}
+                  style={({ pressed }) => [
+                    styles.refreshButton,
+                    isBusy && styles.refreshButtonDisabled,
+                    pressed && !isBusy && styles.refreshButtonPressed,
+                  ]}
+                >
+                  <Text style={styles.refreshButtonText}>피드</Text>
+                </Pressable>
+              ) : null}
+              {selectedCircle && activeView !== "menu" ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isBusy}
+                  onPress={() => {
+                    setActiveView("menu");
+                  }}
+                  style={({ pressed }) => [
+                    styles.refreshButton,
+                    isBusy && styles.refreshButtonDisabled,
+                    pressed && !isBusy && styles.refreshButtonPressed,
+                  ]}
+                >
+                  <Text style={styles.refreshButtonText}>메뉴</Text>
+                </Pressable>
+              ) : null}
               <Pressable
                 accessibilityRole="button"
                 disabled={isRefreshing || isBusy}
@@ -512,26 +637,10 @@ export function CircleHomeScreen({
             </View>
           </View>
           <Text style={styles.heroBody}>
-            오늘은 지난 순간을 한 조각씩 꺼내고, 모임에서 이어질 이야기를 준비해보세요.
+            {selectedCircle
+              ? `현재 선택 모임: ${selectedCircle.name} · ${selectedCircle.role === "admin" ? "관리자" : "멤버"}`
+              : "모임을 만들거나 초대 코드로 참여해 시작해 보세요."}
           </Text>
-          <View style={styles.tabRow}>
-            {HOME_VIEW_TABS.map((tab) => (
-              <Pressable
-                key={tab.key}
-                onPress={() => setActiveView(tab.key)}
-                style={[styles.tabButton, activeView === tab.key && styles.tabButtonActive]}
-              >
-                <Text
-                  style={[
-                    styles.tabButtonText,
-                    activeView === tab.key && styles.tabButtonTextActive,
-                  ]}
-                >
-                  {tab.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
         </View>
 
         {isLoading ? (
@@ -646,53 +755,224 @@ export function CircleHomeScreen({
 
         {!isLoading && selectedCircle ? (
           <>
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionLabel}>모임 선택</Text>
-              <View style={styles.circleTitleRow}>
-                <Text style={styles.circleTitle}>{selectedCircle.name}</Text>
-                <View
-                  style={[
-                    styles.roleBadge,
-                    selectedCircle.role === "admin" ? styles.roleBadgeAdmin : styles.roleBadgeMember,
-                  ]}
-                >
-                  <Text style={styles.roleBadgeText}>
-                    {selectedCircle.role === "admin" ? "관리자" : "멤버"}
-                  </Text>
-                </View>
-              </View>
-              <Text style={styles.mutedText}>
-                현재 선택된 모임이에요. 기억/일정/초대는 모두 이 모임으로 연결돼요.
-              </Text>
-              <View style={styles.circleChipRow}>
-                {circles.map((circle) => (
+            {activeView === "feed" ? (
+              <FeedScreen circleId={selectedCircle.id} refreshToken={feedRefreshToken} />
+            ) : null}
+
+            {activeView === "menu" ? (
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionLabel}>기능 선택</Text>
+                <Text style={styles.mutedText}>한 화면에서 한 작업만 하도록 구성했어요.</Text>
+                <View style={styles.menuGrid}>
                   <Pressable
-                    key={circle.id}
-                    onPress={() => {
-                      void handleSelectCircle(circle.id);
-                    }}
-                    style={[
-                      styles.circleChip,
-                      circle.id === selectedCircleId && styles.circleChipActive,
+                    onPress={() => setActiveView("members")}
+                    style={({ pressed }) => [
+                      styles.menuButton,
+                      pressed && styles.menuButtonPressed,
                     ]}
                   >
-                    <Text
+                    <Text style={styles.menuButtonTitle}>모임 관리</Text>
+                    <Text style={styles.menuButtonCaption}>모임 선택·멤버 확인</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setActiveView("create_circle")}
+                    style={({ pressed }) => [
+                      styles.menuButton,
+                      pressed && styles.menuButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.menuButtonTitle}>모임 만들기</Text>
+                    <Text style={styles.menuButtonCaption}>새 모임 생성</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setActiveView("join_circle")}
+                    style={({ pressed }) => [
+                      styles.menuButton,
+                      pressed && styles.menuButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.menuButtonTitle}>코드로 참여</Text>
+                    <Text style={styles.menuButtonCaption}>초대 코드 입력</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setActiveView("pieces")}
+                    style={({ pressed }) => [
+                      styles.menuButton,
+                      pressed && styles.menuButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.menuButtonTitle}>기억 남기기</Text>
+                    <Text style={styles.menuButtonCaption}>텍스트 조각 작성</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setActiveView("meetup")}
+                    style={({ pressed }) => [
+                      styles.menuButton,
+                      pressed && styles.menuButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.menuButtonTitle}>일정 보기</Text>
+                    <Text style={styles.menuButtonCaption}>다가오는 모임 확인</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setActiveView("meetup_create")}
+                    style={({ pressed }) => [
+                      styles.menuButton,
+                      pressed && styles.menuButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.menuButtonTitle}>일정 만들기</Text>
+                    <Text style={styles.menuButtonCaption}>제목·날짜·시간 입력</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setActiveView("invite")}
+                    style={({ pressed }) => [
+                      styles.menuButton,
+                      pressed && styles.menuButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.menuButtonTitle}>초대 코드</Text>
+                    <Text style={styles.menuButtonCaption}>코드 발급·공유</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
+
+            {activeView === "members" ? (
+              <>
+                <View style={styles.sectionCard}>
+                  <Text style={styles.sectionLabel}>모임 선택</Text>
+                  <View style={styles.circleTitleRow}>
+                    <Text style={styles.circleTitle}>{selectedCircle.name}</Text>
+                    <View
                       style={[
-                        styles.circleChipText,
-                        circle.id === selectedCircleId && styles.circleChipTextActive,
+                        styles.roleBadge,
+                        selectedCircle.role === "admin"
+                          ? styles.roleBadgeAdmin
+                          : styles.roleBadgeMember,
                       ]}
                     >
-                      {circle.name}
-                    </Text>
-                  </Pressable>
-                ))}
+                      <Text style={styles.roleBadgeText}>
+                        {selectedCircle.role === "admin" ? "관리자" : "멤버"}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.circleChipRow}>
+                    {circles.map((circle) => (
+                      <Pressable
+                        key={circle.id}
+                        onPress={() => {
+                          void handleSelectCircle(circle.id);
+                        }}
+                        style={[
+                          styles.circleChip,
+                          circle.id === selectedCircleId && styles.circleChipActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.circleChipText,
+                            circle.id === selectedCircleId && styles.circleChipTextActive,
+                          ]}
+                        >
+                          {circle.name}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.sectionCard}>
+                  <Text style={styles.sectionLabel}>멤버 목록 · {selectedCircle.name}</Text>
+                  {members.length === 0 ? (
+                    <Text style={styles.mutedText}>아직 멤버 정보를 불러오지 못했어요.</Text>
+                  ) : (
+                    <View style={styles.memberList}>
+                      {orderedMembers.map((member) => (
+                        <View key={member.userId} style={styles.memberRow}>
+                          <Text style={styles.memberNameText}>
+                            {member.userId === userId
+                              ? "나"
+                              : `사용자 ${member.userId.slice(0, 6).toUpperCase()}`}
+                          </Text>
+                          <View
+                            style={[
+                              styles.memberRoleBadge,
+                              member.role === "admin"
+                                ? styles.memberRoleBadgeAdmin
+                                : styles.memberRoleBadgeMember,
+                            ]}
+                          >
+                            <Text style={styles.memberRoleBadgeText}>
+                              {member.role === "admin" ? "관리자" : "멤버"}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              </>
+            ) : null}
+
+            {activeView === "create_circle" ? (
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionLabel}>모임 만들기</Text>
+                <TextInput
+                  onChangeText={setCircleName}
+                  placeholder="모임 이름"
+                  placeholderTextColor={colors.textSecondary}
+                  style={styles.input}
+                  value={circleName}
+                />
+                <Pressable
+                  disabled={isBusy || circleName.trim().length === 0}
+                  onPress={handleCreateCircle}
+                  style={({ pressed }) => [
+                    styles.actionButton,
+                    (isBusy || circleName.trim().length === 0) && styles.actionButtonDisabled,
+                    pressed &&
+                      !(isBusy || circleName.trim().length === 0) &&
+                      styles.actionButtonPressed,
+                  ]}
+                >
+                  <Text style={styles.actionButtonText}>
+                    {isActionBusy("create_circle") ? "생성 중..." : "모임 만들기"}
+                  </Text>
+                </Pressable>
               </View>
-              <View style={styles.memberSummaryRow}>
-                <Text style={styles.memberSummaryText}>
-                  멤버 {members.length}명
-                </Text>
+            ) : null}
+
+            {activeView === "join_circle" ? (
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionLabel}>코드로 모임 참여</Text>
+                <TextInput
+                  autoCapitalize="characters"
+                  onChangeText={(next) => {
+                    setJoinCode(normalizeInviteCode(next));
+                  }}
+                  placeholder="참여 코드 입력 (예: ABCD-1234)"
+                  placeholderTextColor={colors.textSecondary}
+                  style={styles.input}
+                  value={formatInviteCode(joinCode)}
+                />
+                <Pressable
+                  disabled={isBusy || joinCode.trim().length === 0}
+                  onPress={handleJoinByCode}
+                  style={({ pressed }) => [
+                    styles.actionButton,
+                    (isBusy || joinCode.trim().length === 0) && styles.actionButtonDisabled,
+                    pressed &&
+                      !(isBusy || joinCode.trim().length === 0) &&
+                      styles.actionButtonPressed,
+                  ]}
+                >
+                  <Text style={styles.actionButtonText}>
+                    {isActionBusy("join_circle") ? "참여 중..." : "코드로 참여하기"}
+                  </Text>
+                </Pressable>
               </View>
-            </View>
+            ) : null}
 
             {activeView === "pieces" ? (
               <>
@@ -746,20 +1026,106 @@ export function CircleHomeScreen({
               </>
             ) : null}
 
+            {activeView === "meetup" ? (
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionLabel}>다가오는 모임 · {selectedCircle.name}</Text>
+                <Pressable
+                  onPress={() => setActiveView("meetup_create")}
+                  style={({ pressed }) => [
+                    styles.secondaryButton,
+                    pressed && styles.secondaryButtonPressed,
+                  ]}
+                >
+                  <Text style={styles.secondaryButtonText}>일정 만들기 화면 열기</Text>
+                </Pressable>
+                {meetups.length === 0 ? (
+                  <Text style={styles.mutedText}>아직 등록된 모임이 없어요.</Text>
+                ) : (
+                  <View style={styles.meetupList}>
+                    {meetups.map((meetup) => (
+                      <View key={meetup.id} style={styles.meetupCard}>
+                        <Text style={styles.meetupCardTitle}>{meetup.title}</Text>
+                        <Text style={styles.meetupCardMeta}>
+                          {formatMeetupScheduleLabel(meetup.scheduledAt)}
+                        </Text>
+                        <MeetupDetailScreen
+                          meetup={{ id: meetup.id, title: meetup.title }}
+                          pieces={pieces}
+                          currentUserId={userId}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            ) : null}
+
+            {activeView === "meetup_create" ? (
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionLabel}>일정 만들기 · {selectedCircle.name}</Text>
+                <TextInput
+                  onChangeText={setMeetupTitle}
+                  placeholder="모임 제목"
+                  placeholderTextColor={colors.textSecondary}
+                  style={styles.input}
+                  value={meetupTitle}
+                />
+                <TextInput
+                  autoCapitalize="none"
+                  onChangeText={setMeetupDateInput}
+                  placeholder="날짜 (YYYY-MM-DD)"
+                  placeholderTextColor={colors.textSecondary}
+                  style={styles.input}
+                  value={meetupDateInput}
+                />
+                <TextInput
+                  autoCapitalize="none"
+                  onChangeText={setMeetupTimeInput}
+                  placeholder="시간 (HH:MM)"
+                  placeholderTextColor={colors.textSecondary}
+                  style={styles.input}
+                  value={meetupTimeInput}
+                />
+                <Pressable
+                  disabled={
+                    isBusy ||
+                    meetupTitle.trim().length === 0 ||
+                    meetupDateInput.trim().length === 0 ||
+                    meetupTimeInput.trim().length === 0
+                  }
+                  onPress={handleCreateMeetup}
+                  style={({ pressed }) => [
+                    styles.actionButton,
+                    (isBusy ||
+                      meetupTitle.trim().length === 0 ||
+                      meetupDateInput.trim().length === 0 ||
+                      meetupTimeInput.trim().length === 0) &&
+                      styles.actionButtonDisabled,
+                    pressed &&
+                      !(isBusy ||
+                        meetupTitle.trim().length === 0 ||
+                        meetupDateInput.trim().length === 0 ||
+                        meetupTimeInput.trim().length === 0) &&
+                      styles.actionButtonPressed,
+                  ]}
+                >
+                  <Text style={styles.actionButtonText}>
+                    {isActionBusy("create_meetup") ? "저장 중..." : "일정 저장"}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+
             {activeView === "invite" ? (
               <View style={styles.sectionCard}>
-                <Text style={styles.sectionLabel}>초대/참여 · {selectedCircle.name}</Text>
-                <Text style={styles.mutedText}>
-                  초대받아 들어온 모임도 모두 같은 방식으로 목록에 합쳐지고, 선택한 모임 기준으로
-                  기억/일정이 연결돼요.
-                </Text>
+                <Text style={styles.sectionLabel}>초대 코드 · {selectedCircle.name}</Text>
                 {selectedCircle.role === "admin" ? (
                   <>
                     {inviteCode ? (
                       <Text style={styles.inviteCodeText}>{formatInviteCode(inviteCode)}</Text>
                     ) : null}
                     <Text style={styles.mutedText}>
-                      새 코드를 발급하면 기존 코드는 바로 만료돼요.
+                      새 코드를 발급하면 기존 코드는 즉시 만료돼요.
                     </Text>
                     <Pressable
                       disabled={isBusy}
@@ -831,119 +1197,9 @@ export function CircleHomeScreen({
                 ) : (
                   <Text style={styles.mutedText}>현재 계정은 멤버 권한이라 초대 코드를 만들 수 없어요.</Text>
                 )}
-                <TextInput
-                  autoCapitalize="characters"
-                  onChangeText={(next) => {
-                    setJoinCode(normalizeInviteCode(next));
-                  }}
-                  placeholder="참여 코드 입력 (예: ABCD-1234)"
-                  placeholderTextColor={colors.textSecondary}
-                  style={styles.input}
-                  value={formatInviteCode(joinCode)}
-                />
-                <Pressable
-                  disabled={isBusy || joinCode.trim().length === 0}
-                  onPress={handleJoinByCode}
-                  style={({ pressed }) => [
-                    styles.actionButton,
-                    (isBusy || joinCode.trim().length === 0) && styles.actionButtonDisabled,
-                    pressed &&
-                      !(isBusy || joinCode.trim().length === 0) &&
-                      styles.actionButtonPressed,
-                  ]}
-                >
-                  <Text style={styles.actionButtonText}>
-                    {isActionBusy("join_circle") ? "참여 중..." : "코드로 참여"}
-                  </Text>
-                </Pressable>
-              </View>
-            ) : null}
-
-            {activeView === "meetup" ? (
-              <>
-                <View style={styles.sectionCard}>
-                  <Text style={styles.sectionLabel}>새 모임 일정 추가 · {selectedCircle.name}</Text>
-                  <TextInput
-                    onChangeText={setMeetupTitle}
-                    placeholder="새 모임 제목"
-                    placeholderTextColor={colors.textSecondary}
-                    style={styles.input}
-                    value={meetupTitle}
-                  />
-                  <Pressable
-                    disabled={isBusy || meetupTitle.trim().length === 0}
-                    onPress={handleCreateMeetup}
-                    style={({ pressed }) => [
-                      styles.actionButton,
-                      (isBusy || meetupTitle.trim().length === 0) && styles.actionButtonDisabled,
-                      pressed &&
-                        !(isBusy || meetupTitle.trim().length === 0) &&
-                        styles.actionButtonPressed,
-                    ]}
-                  >
-                    <Text style={styles.actionButtonText}>
-                      {isActionBusy("create_meetup") ? "저장 중..." : "모임 추가"}
-                    </Text>
-                  </Pressable>
-                </View>
-
-                <View style={styles.sectionCard}>
-                  <Text style={styles.sectionLabel}>다가오는 모임 · {selectedCircle.name}</Text>
-                  {meetups.length === 0 ? (
-                    <Text style={styles.mutedText}>
-                      아직 등록된 모임이 없어요. 위에서 첫 모임을 만들어보세요.
-                    </Text>
-                  ) : (
-                    meetups.map((meetup) => (
-                      <MeetupDetailScreen
-                        key={meetup.id}
-                        meetup={{ id: meetup.id, title: meetup.title }}
-                        pieces={pieces}
-                        currentUserId={userId}
-                      />
-                    ))
-                  )}
-                </View>
-              </>
-            ) : null}
-
-            {activeView === "members" ? (
-              <View style={styles.sectionCard}>
-                <Text style={styles.sectionLabel}>모임 멤버 · {selectedCircle.name}</Text>
-                {members.length === 0 ? (
-                  <Text style={styles.mutedText}>아직 멤버 정보를 불러오지 못했어요.</Text>
-                ) : (
-                  <View style={styles.memberList}>
-                    {orderedMembers.map((member) => (
-                      <View key={member.userId} style={styles.memberRow}>
-                        <Text style={styles.memberNameText}>
-                          {member.userId === userId
-                            ? "나"
-                            : `사용자 ${member.userId.slice(0, 6).toUpperCase()}`}
-                        </Text>
-                        <View
-                          style={[
-                            styles.memberRoleBadge,
-                            member.role === "admin"
-                              ? styles.memberRoleBadgeAdmin
-                              : styles.memberRoleBadgeMember,
-                          ]}
-                        >
-                          <Text style={styles.memberRoleBadgeText}>
-                            {member.role === "admin" ? "관리자" : "멤버"}
-                          </Text>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
               </View>
             ) : null}
           </>
-        ) : null}
-
-        {!isLoading && selectedCircle && activeView === "feed" ? (
-          <FeedScreen circleId={selectedCircle.id} refreshToken={feedRefreshToken} />
         ) : null}
 
         {successMessage ? (
@@ -1051,31 +1307,6 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 12,
     fontWeight: "700",
-  },
-  tabRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 6,
-  },
-  tabButton: {
-    backgroundColor: colors.surfaceMuted,
-    borderColor: colors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  tabButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  tabButtonText: {
-    color: colors.textPrimary,
-    fontWeight: "600",
-  },
-  tabButtonTextActive: {
-    color: "#fff",
   },
   sectionCard: {
     backgroundColor: colors.surface,
@@ -1280,12 +1511,49 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
   },
-  memberSummaryRow: {
-    alignItems: "flex-end",
+  menuGrid: {
+    gap: 8,
   },
-  memberSummaryText: {
+  menuButton: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  menuButtonPressed: {
+    opacity: 0.75,
+  },
+  menuButtonTitle: {
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  menuButtonCaption: {
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 12,
+  },
+  meetupList: {
+    gap: 12,
+  },
+  meetupCard: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12,
+  },
+  meetupCardTitle: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  meetupCardMeta: {
+    color: colors.textSecondary,
+    fontSize: 12,
     fontWeight: "600",
   },
   memberList: {

@@ -1,6 +1,23 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { CircleHomeScreen } from "../CircleHomeScreen";
 
+jest.mock("../../feed/FeedScreen", () => {
+  const React = require("react");
+  const { Text } = require("react-native");
+  return {
+    FeedScreen: ({ circleId }: { circleId: string }) => React.createElement(Text, null, `피드:${circleId}`),
+  };
+});
+
+jest.mock("../../meetup/MeetupDetailScreen", () => {
+  const React = require("react");
+  const { Text } = require("react-native");
+  return {
+    MeetupDetailScreen: ({ meetup }: { meetup: { title: string } }) =>
+      React.createElement(Text, null, meetup.title),
+  };
+});
+
 const createServiceMock = () => ({
   fetchMyCircles: jest.fn().mockResolvedValue([]),
   fetchMeetupsByCircle: jest.fn().mockResolvedValue([]),
@@ -31,7 +48,12 @@ describe("CircleHomeScreen", () => {
     const service = createServiceMock();
     service.fetchMyCircles.mockResolvedValue([{ id: "c1", name: "우리 모임", role: "admin" }]);
     service.fetchMeetupsByCircle.mockResolvedValue([
-      { id: "m1", title: "금요일 저녁 모임", status: "planned" },
+      {
+        id: "m1",
+        title: "금요일 저녁 모임",
+        status: "planned",
+        scheduledAt: "2026-03-01T10:00:00.000Z",
+      },
     ]);
     service.fetchCircleMembers.mockResolvedValue([
       { userId: "user-1", role: "admin", joinedAt: "2026-02-23T12:00:00.000Z" },
@@ -41,21 +63,15 @@ describe("CircleHomeScreen", () => {
     render(<CircleHomeScreen userId="user-1" service={service} />);
 
     await waitFor(() => {
-      expect(screen.getAllByText("우리 모임").length).toBeGreaterThan(0);
-      expect(screen.getByText("모임 멤버 · 우리 모임")).toBeTruthy();
+      expect(screen.getByText("피드:c1")).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText("일정"));
+    fireEvent.press(screen.getByText("메뉴"));
+    fireEvent.press(screen.getByText("일정 보기"));
 
     await waitFor(() => {
-      expect(screen.getByText("금요일 저녁 모임")).toBeTruthy();
-    });
-
-    fireEvent.press(screen.getByText("모임"));
-
-    await waitFor(() => {
-      expect(screen.getByText("모임 멤버 · 우리 모임")).toBeTruthy();
-      expect(screen.getByText("나")).toBeTruthy();
+      expect(screen.getByText("다가오는 모임 · 우리 모임")).toBeTruthy();
+      expect(screen.getAllByText("금요일 저녁 모임").length).toBeGreaterThan(0);
     });
   });
 
@@ -109,10 +125,8 @@ describe("CircleHomeScreen", () => {
       expect(service.fetchMeetupsByCircle).toHaveBeenCalledWith("c2");
       expect(service.fetchCircleMembers).toHaveBeenCalledWith("c2");
       expect(service.fetchPiecesByCircle).toHaveBeenCalledWith("c2");
-      expect(screen.getAllByText("우리 동네 팀").length).toBeGreaterThan(0);
-      expect(screen.getByText("모임에 참여했어요.")).toBeTruthy();
       expect(screen.getByText("참여 완료! 첫 조각을 남겨볼까요?")).toBeTruthy();
-      expect(screen.getByText("첫 조각 작성하기")).toBeTruthy();
+      expect(screen.getByText("기억 조각 추가 · 우리 동네 팀")).toBeTruthy();
     });
   });
 
@@ -128,10 +142,11 @@ describe("CircleHomeScreen", () => {
     render(<CircleHomeScreen userId="user-1" service={service} />);
 
     await waitFor(() => {
-      expect(screen.getAllByText("동네 친구").length).toBeGreaterThan(0);
+      expect(screen.getByText("피드:c1")).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText("초대"));
+    fireEvent.press(screen.getByText("메뉴"));
+    fireEvent.press(screen.getByText("초대 코드"));
 
     await waitFor(() => {
       expect(screen.getByText("현재 계정은 멤버 권한이라 초대 코드를 만들 수 없어요.")).toBeTruthy();
@@ -187,10 +202,11 @@ describe("CircleHomeScreen", () => {
     render(<CircleHomeScreen userId="user-1" service={service} />);
 
     await waitFor(() => {
-      expect(screen.getAllByText("우리 모임").length).toBeGreaterThan(0);
+      expect(screen.getByText("피드:c1")).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText("초대"));
+    fireEvent.press(screen.getByText("메뉴"));
+    fireEvent.press(screen.getByText("초대 코드"));
 
     await waitFor(() => {
       expect(service.fetchLatestCircleInviteCode).toHaveBeenCalledWith("c1");
@@ -212,10 +228,11 @@ describe("CircleHomeScreen", () => {
     render(<CircleHomeScreen userId="user-1" service={service} />);
 
     await waitFor(() => {
-      expect(screen.getAllByText("우리 모임").length).toBeGreaterThan(0);
+      expect(screen.getByText("피드:c1")).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText("초대"));
+    fireEvent.press(screen.getByText("메뉴"));
+    fireEvent.press(screen.getByText("초대 코드"));
 
     await waitFor(() => {
       expect(screen.getByText("새 코드 다시 발급")).toBeTruthy();
@@ -249,7 +266,7 @@ describe("CircleHomeScreen", () => {
     render(<CircleHomeScreen userId="user-1" service={service} />);
 
     await waitFor(() => {
-      expect(screen.getAllByText("우리 모임").length).toBeGreaterThan(0);
+      expect(screen.getByText("피드:c1")).toBeTruthy();
     });
 
     fireEvent.press(screen.getByText("새로고침"));
@@ -259,7 +276,7 @@ describe("CircleHomeScreen", () => {
     });
   });
 
-  it("shows one focus panel at a time in home tab", async () => {
+  it("shows one functional screen at a time", async () => {
     const service = createServiceMock();
     service.fetchMyCircles.mockResolvedValue([{ id: "c1", name: "우리 모임", role: "admin" }]);
     service.fetchMeetupsByCircle.mockResolvedValue([]);
@@ -271,19 +288,18 @@ describe("CircleHomeScreen", () => {
     render(<CircleHomeScreen userId="user-1" service={service} />);
 
     await waitFor(() => {
-      expect(screen.getByText("모임 멤버 · 우리 모임")).toBeTruthy();
+      expect(screen.getByText("피드:c1")).toBeTruthy();
     });
 
-    expect(screen.queryByText("초대 코드 발급하기")).toBeNull();
-
-    fireEvent.press(screen.getByText("기억"));
+    fireEvent.press(screen.getByText("메뉴"));
+    fireEvent.press(screen.getByText("기억 남기기"));
 
     await waitFor(() => {
       expect(screen.getByText("기억 조각 추가 · 우리 모임")).toBeTruthy();
-      expect(screen.queryByText("초대 코드 발급하기")).toBeNull();
     });
 
-    fireEvent.press(screen.getByText("초대"));
+    fireEvent.press(screen.getByText("메뉴"));
+    fireEvent.press(screen.getByText("초대 코드"));
 
     await waitFor(() => {
       expect(screen.getByText("초대 코드 발급하기")).toBeTruthy();

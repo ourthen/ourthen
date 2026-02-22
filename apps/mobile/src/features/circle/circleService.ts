@@ -27,6 +27,7 @@ export type MeetupSummary = {
   id: string;
   title: string;
   status: string;
+  scheduledAt: string | null;
 };
 
 export type CircleMemberSummary = {
@@ -181,8 +182,9 @@ export async function fetchMyCircles(userId: string): Promise<CircleSummary[]> {
 export async function fetchMeetupsByCircle(circleId: string): Promise<MeetupSummary[]> {
   const { data, error } = await supabase
     .from("meetups")
-    .select("id, title, status")
+    .select("id, title, status, scheduled_at, created_at")
     .eq("circle_id", circleId)
+    .order("scheduled_at", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -190,11 +192,17 @@ export async function fetchMeetupsByCircle(circleId: string): Promise<MeetupSumm
   }
 
   return (
-    (data as Array<{ id: string; title: string; status: string }> | null)?.map(
+    (data as Array<{
+      id: string;
+      title: string;
+      status: string;
+      scheduled_at: string | null;
+    }> | null)?.map(
       (row) => ({
         id: row.id,
         title: row.title,
         status: row.status,
+        scheduledAt: row.scheduled_at,
       }),
     ) ?? []
   );
@@ -224,23 +232,23 @@ export async function fetchCircleMembers(
   }));
 }
 
-type RawPieceRow = {
-  id: string;
-  feed_items:
+type RawPieceFeedRow = {
+  body: string | null;
+  pieces:
     | {
-        body: string | null;
+        id: string;
       }
     | Array<{
-        body: string | null;
+        id: string;
       }>
     | null;
 };
 
 export async function fetchPiecesByCircle(circleId: string): Promise<PieceSummary[]> {
   const { data, error } = await supabase
-    .from("pieces")
-    .select("id, feed_items!inner(body, circle_id)")
-    .eq("feed_items.circle_id", circleId)
+    .from("feed_items")
+    .select("body, created_at, pieces!inner(id)")
+    .eq("circle_id", circleId)
     .order("created_at", { ascending: false })
     .limit(30);
 
@@ -248,11 +256,11 @@ export async function fetchPiecesByCircle(circleId: string): Promise<PieceSummar
     throw error;
   }
 
-  return ((data as unknown as RawPieceRow[]) ?? []).map((row, index) => {
-    const feedItem = Array.isArray(row.feed_items) ? row.feed_items[0] : row.feed_items;
+  return ((data as unknown as RawPieceFeedRow[]) ?? []).map((row, index) => {
+    const piece = Array.isArray(row.pieces) ? row.pieces[0] : row.pieces;
     return {
-      id: row.id,
-      label: feedItem?.body?.trim() || `기억 조각 ${index + 1}`,
+      id: piece?.id ?? `missing-piece-${index + 1}`,
+      label: row.body?.trim() || `기억 조각 ${index + 1}`,
     };
   });
 }
@@ -261,10 +269,20 @@ export async function createMeetup(
   circleId: string,
   userId: string,
   title: string,
+  scheduledAt: string,
 ): Promise<MeetupSummary> {
   const trimmedTitle = title.trim();
   if (!trimmedTitle) {
     throw new Error("모임 제목을 입력해 주세요.");
+  }
+
+  if (!scheduledAt.trim()) {
+    throw new Error("모임 날짜와 시간을 입력해 주세요.");
+  }
+
+  const scheduledDate = new Date(scheduledAt);
+  if (Number.isNaN(scheduledDate.getTime())) {
+    throw new Error("모임 날짜 형식이 올바르지 않아요.");
   }
 
   const { data, error } = await supabase
@@ -274,8 +292,9 @@ export async function createMeetup(
       host_id: userId,
       title: trimmedTitle,
       status: "planned",
+      scheduled_at: scheduledDate.toISOString(),
     })
-    .select("id, title, status")
+    .select("id, title, status, scheduled_at")
     .single();
 
   if (error) {
@@ -286,6 +305,7 @@ export async function createMeetup(
     id: data.id,
     title: data.title,
     status: data.status,
+    scheduledAt: data.scheduled_at,
   };
 }
 
