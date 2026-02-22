@@ -42,8 +42,18 @@ describe("CircleHomeScreen", () => {
 
     await waitFor(() => {
       expect(screen.getAllByText("우리 모임").length).toBeGreaterThan(0);
-      expect(screen.getByText("금요일 저녁 모임")).toBeTruthy();
       expect(screen.getAllByText("첫 기억").length).toBeGreaterThan(0);
+    });
+
+    fireEvent.press(screen.getByText("모임 일정"));
+
+    await waitFor(() => {
+      expect(screen.getByText("금요일 저녁 모임")).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText("멤버 목록"));
+
+    await waitFor(() => {
       expect(screen.getByText("모임 멤버")).toBeTruthy();
       expect(screen.getByText("나")).toBeTruthy();
     });
@@ -119,6 +129,11 @@ describe("CircleHomeScreen", () => {
 
     await waitFor(() => {
       expect(screen.getAllByText("동네 친구").length).toBeGreaterThan(0);
+    });
+
+    fireEvent.press(screen.getByText("초대/참여"));
+
+    await waitFor(() => {
       expect(screen.getByText("현재 계정은 멤버 권한이라 초대 코드를 만들 수 없어요.")).toBeTruthy();
     });
 
@@ -172,6 +187,12 @@ describe("CircleHomeScreen", () => {
     render(<CircleHomeScreen userId="user-1" service={service} />);
 
     await waitFor(() => {
+      expect(screen.getAllByText("우리 모임").length).toBeGreaterThan(0);
+    });
+
+    fireEvent.press(screen.getByText("초대/참여"));
+
+    await waitFor(() => {
       expect(service.fetchLatestCircleInviteCode).toHaveBeenCalledWith("c1");
       expect(screen.getByText("ZXCV-1234")).toBeTruthy();
     });
@@ -189,6 +210,12 @@ describe("CircleHomeScreen", () => {
     service.createCircleInviteCode.mockResolvedValue("QWER5678");
 
     render(<CircleHomeScreen userId="user-1" service={service} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("우리 모임").length).toBeGreaterThan(0);
+    });
+
+    fireEvent.press(screen.getByText("초대/참여"));
 
     await waitFor(() => {
       expect(screen.getByText("새 코드 다시 발급")).toBeTruthy();
@@ -229,6 +256,31 @@ describe("CircleHomeScreen", () => {
 
     await waitFor(() => {
       expect(service.fetchMyCircles).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("shows one focus panel at a time in home tab", async () => {
+    const service = createServiceMock();
+    service.fetchMyCircles.mockResolvedValue([{ id: "c1", name: "우리 모임", role: "admin" }]);
+    service.fetchMeetupsByCircle.mockResolvedValue([]);
+    service.fetchCircleMembers.mockResolvedValue([
+      { userId: "user-1", role: "admin", joinedAt: "2026-02-23T12:00:00.000Z" },
+    ]);
+    service.fetchPiecesByCircle.mockResolvedValue([]);
+
+    render(<CircleHomeScreen userId="user-1" service={service} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("기억 조각 추가")).toBeTruthy();
+    });
+
+    expect(screen.queryByText("초대 코드 발급하기")).toBeNull();
+
+    fireEvent.press(screen.getByText("초대/참여"));
+
+    await waitFor(() => {
+      expect(screen.getByText("초대 코드 발급하기")).toBeTruthy();
+      expect(screen.queryByText("기억 조각 추가")).toBeNull();
     });
   });
 

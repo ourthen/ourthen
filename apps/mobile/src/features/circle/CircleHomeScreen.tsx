@@ -58,6 +58,8 @@ type BusyAction =
   | "create_meetup"
   | "create_piece";
 
+type HomeFocusPanel = "pieces" | "invite" | "meetup" | "members";
+
 function normalizeInviteCode(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
 }
@@ -108,6 +110,7 @@ export function CircleHomeScreen({
   const [meetupTitle, setMeetupTitle] = useState("");
   const [pieceBody, setPieceBody] = useState("");
   const [activeTab, setActiveTab] = useState<"home" | "feed">("home");
+  const [homeFocusPanel, setHomeFocusPanel] = useState<HomeFocusPanel>("pieces");
   const [emptyStateMode, setEmptyStateMode] = useState<"create" | "join">("create");
   const [isLoading, setIsLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<BusyAction | null>(null);
@@ -120,7 +123,6 @@ export function CircleHomeScreen({
   const [isInviteRotateConfirming, setIsInviteRotateConfirming] = useState(false);
   const pieceInputRef = useRef<TextInput | null>(null);
 
-  const isSplitLayout = layout.breakpoint === "desktop";
   const selectedCircle = useMemo(
     () => circles.find((circle) => circle.id === selectedCircleId) ?? null,
     [circles, selectedCircleId],
@@ -241,6 +243,7 @@ export function CircleHomeScreen({
     setInviteCode("");
     setIsInviteRotateConfirming(false);
     setShowFirstPieceNudge(false);
+    setHomeFocusPanel("pieces");
     setSelectedCircleId(circleId);
     try {
       setErrorMessage("");
@@ -314,6 +317,7 @@ export function CircleHomeScreen({
       const joinedCircle = await service.joinCircleByInviteCode(joinCode);
       setJoinCode("");
       setActiveTab("home");
+      setHomeFocusPanel("pieces");
       setInviteCode("");
       setIsInviteRotateConfirming(false);
       setCircles((prev) => [joinedCircle, ...prev.filter((row) => row.id !== joinedCircle.id)]);
@@ -438,6 +442,7 @@ export function CircleHomeScreen({
   const handleStartFirstPiece = () => {
     setShowFirstPieceNudge(false);
     setActiveTab("home");
+    setHomeFocusPanel("pieces");
     setTimeout(() => {
       pieceInputRef.current?.focus();
     }, 40);
@@ -687,244 +692,325 @@ export function CircleHomeScreen({
               </View>
             </View>
 
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionLabel}>모임 멤버</Text>
-              {members.length === 0 ? (
-                <Text style={styles.mutedText}>아직 멤버 정보를 불러오지 못했어요.</Text>
-              ) : (
-                <View style={styles.memberList}>
-                  {orderedMembers.map((member) => (
-                    <View key={member.userId} style={styles.memberRow}>
-                      <Text style={styles.memberNameText}>
-                        {member.userId === userId
-                          ? "나"
-                          : `사용자 ${member.userId.slice(0, 6).toUpperCase()}`}
-                      </Text>
-                      <View
-                        style={[
-                          styles.memberRoleBadge,
-                          member.role === "admin"
-                            ? styles.memberRoleBadgeAdmin
-                            : styles.memberRoleBadgeMember,
-                        ]}
-                      >
-                        <Text style={styles.memberRoleBadgeText}>
-                          {member.role === "admin" ? "관리자" : "멤버"}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
-
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionLabel}>초대/참여</Text>
-              <Text style={styles.mutedText}>
-                초대 코드를 만들어 전달하거나, 받은 코드를 입력해 다른 모임에 참여할 수 있어요.
-              </Text>
-              {selectedCircle.role === "admin" ? (
-                <>
-                  {inviteCode ? (
-                    <Text style={styles.inviteCodeText}>{formatInviteCode(inviteCode)}</Text>
-                  ) : null}
-                  <Text style={styles.mutedText}>
-                    새 코드를 발급하면 기존 코드는 바로 만료돼요.
-                  </Text>
-                  <Pressable
-                    disabled={isBusy}
-                    onPress={handleCreateInviteCode}
-                    style={({ pressed }) => [
-                      styles.actionButton,
-                      isBusy && styles.actionButtonDisabled,
-                      pressed && !isBusy && styles.actionButtonPressed,
-                    ]}
-                  >
-                    <Text style={styles.actionButtonText}>
-                      {isActionBusy("create_invite")
-                        ? "발급 중..."
-                        : inviteCode
-                          ? "새 코드 다시 발급"
-                          : "초대 코드 발급하기"}
-                    </Text>
-                  </Pressable>
-                  {isInviteRotateConfirming ? (
-                    <View style={styles.confirmCard}>
-                      <Text style={styles.confirmText}>
-                        기존 코드를 공유한 사람이 있다면 새 코드로 다시 안내해 주세요.
-                      </Text>
-                      <View style={styles.confirmActionRow}>
-                        <Pressable
-                          disabled={isBusy}
-                          onPress={() => {
-                            setIsInviteRotateConfirming(false);
-                            setSuccessMessage("");
-                          }}
-                          style={({ pressed }) => [
-                            styles.confirmCancelButton,
-                            isBusy && styles.secondaryButtonDisabled,
-                            pressed && !isBusy && styles.secondaryButtonPressed,
-                          ]}
-                        >
-                          <Text style={styles.confirmCancelButtonText}>취소</Text>
-                        </Pressable>
-                        <Pressable
-                          disabled={isBusy}
-                          onPress={handleCreateInviteCode}
-                          style={({ pressed }) => [
-                            styles.confirmPrimaryButton,
-                            isBusy && styles.actionButtonDisabled,
-                            pressed && !isBusy && styles.actionButtonPressed,
-                          ]}
-                        >
-                          <Text style={styles.confirmPrimaryButtonText}>새 코드 발급 진행</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ) : null}
-                  {inviteCode ? (
-                    <Pressable
-                      disabled={isBusy}
-                      onPress={handleShareInviteCode}
-                      style={({ pressed }) => [
-                        styles.secondaryButton,
-                        isBusy && styles.secondaryButtonDisabled,
-                        pressed && !isBusy && styles.secondaryButtonPressed,
-                      ]}
-                    >
-                      <Text style={styles.secondaryButtonText}>
-                        {isActionBusy("share_invite") ? "공유 중..." : "초대 코드 공유하기"}
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                </>
-              ) : (
-                <Text style={styles.mutedText}>현재 계정은 멤버 권한이라 초대 코드를 만들 수 없어요.</Text>
-              )}
-              <TextInput
-                autoCapitalize="characters"
-                onChangeText={(next) => {
-                  setJoinCode(normalizeInviteCode(next));
-                }}
-                placeholder="참여 코드 입력 (예: ABCD-1234)"
-                placeholderTextColor={colors.textSecondary}
-                style={styles.input}
-                value={formatInviteCode(joinCode)}
-              />
+            <View style={styles.focusTabRow}>
               <Pressable
-                disabled={isBusy || joinCode.trim().length === 0}
-                onPress={handleJoinByCode}
-                style={({ pressed }) => [
-                  styles.actionButton,
-                  (isBusy || joinCode.trim().length === 0) && styles.actionButtonDisabled,
-                  pressed && !(isBusy || joinCode.trim().length === 0) && styles.actionButtonPressed,
+                onPress={() => setHomeFocusPanel("pieces")}
+                style={[
+                  styles.focusTabButton,
+                  homeFocusPanel === "pieces" && styles.focusTabButtonActive,
                 ]}
               >
-                <Text style={styles.actionButtonText}>
-                  {isActionBusy("join_circle") ? "참여 중..." : "코드로 참여"}
+                <Text
+                  style={[
+                    styles.focusTabButtonText,
+                    homeFocusPanel === "pieces" && styles.focusTabButtonTextActive,
+                  ]}
+                >
+                  기억 조각
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setHomeFocusPanel("invite")}
+                style={[
+                  styles.focusTabButton,
+                  homeFocusPanel === "invite" && styles.focusTabButtonActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.focusTabButtonText,
+                    homeFocusPanel === "invite" && styles.focusTabButtonTextActive,
+                  ]}
+                >
+                  초대/참여
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setHomeFocusPanel("meetup")}
+                style={[
+                  styles.focusTabButton,
+                  homeFocusPanel === "meetup" && styles.focusTabButtonActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.focusTabButtonText,
+                    homeFocusPanel === "meetup" && styles.focusTabButtonTextActive,
+                  ]}
+                >
+                  모임 일정
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setHomeFocusPanel("members")}
+                style={[
+                  styles.focusTabButton,
+                  homeFocusPanel === "members" && styles.focusTabButtonActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.focusTabButtonText,
+                    homeFocusPanel === "members" && styles.focusTabButtonTextActive,
+                  ]}
+                >
+                  멤버 목록
                 </Text>
               </Pressable>
             </View>
 
-            <View style={[styles.sectionGrid, isSplitLayout && styles.sectionGridDesktop]}>
-              <View style={styles.sectionCard}>
-                <Text style={styles.sectionLabel}>이번 주 분위기</Text>
-                <PuzzleCard
-                  score={Math.max(1, Math.min(100, pieces.length * 12 + meetups.length * 8))}
-                  theme={pieces[0]?.label ?? "새로운 기억을 기다리는 중"}
-                />
-              </View>
+            {homeFocusPanel === "pieces" ? (
+              <>
+                <View style={styles.sectionCard}>
+                  <Text style={styles.sectionLabel}>이번 주 분위기</Text>
+                  <PuzzleCard
+                    score={Math.max(1, Math.min(100, pieces.length * 12 + meetups.length * 8))}
+                    theme={pieces[0]?.label ?? "새로운 기억을 기다리는 중"}
+                  />
+                </View>
 
+                {showFirstPieceNudge ? (
+                  <View style={styles.onboardingCard}>
+                    <Text style={styles.onboardingTitle}>참여 완료! 첫 조각을 남겨볼까요?</Text>
+                    <Text style={styles.onboardingBody}>
+                      지금 한 줄만 적어도 모임 피드에 바로 공유돼요.
+                    </Text>
+                    <Pressable
+                      disabled={isBusy}
+                      onPress={handleStartFirstPiece}
+                      style={({ pressed }) => [
+                        styles.actionButton,
+                        isBusy && styles.actionButtonDisabled,
+                        pressed && !isBusy && styles.actionButtonPressed,
+                      ]}
+                    >
+                      <Text style={styles.actionButtonText}>첫 조각 작성하기</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+
+                <View style={styles.sectionCard}>
+                  <Text style={styles.sectionLabel}>기억 조각 추가</Text>
+                  <TextInput
+                    ref={pieceInputRef}
+                    multiline
+                    onChangeText={setPieceBody}
+                    placeholder="새 기억 조각"
+                    placeholderTextColor={colors.textSecondary}
+                    style={[styles.input, styles.multilineInput]}
+                    value={pieceBody}
+                  />
+                  <Pressable
+                    disabled={isBusy || pieceBody.trim().length === 0}
+                    onPress={handleCreatePiece}
+                    style={({ pressed }) => [
+                      styles.actionButton,
+                      (isBusy || pieceBody.trim().length === 0) && styles.actionButtonDisabled,
+                      pressed &&
+                        !(isBusy || pieceBody.trim().length === 0) &&
+                        styles.actionButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.actionButtonText}>
+                      {isActionBusy("create_piece") ? "저장 중..." : "조각 저장"}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
+
+            {homeFocusPanel === "invite" ? (
               <View style={styles.sectionCard}>
-                <Text style={styles.sectionLabel}>새 모임 만들기</Text>
+                <Text style={styles.sectionLabel}>초대/참여</Text>
+                <Text style={styles.mutedText}>
+                  초대 코드를 만들어 전달하거나, 받은 코드를 입력해 다른 모임에 참여할 수 있어요.
+                </Text>
+                {selectedCircle.role === "admin" ? (
+                  <>
+                    {inviteCode ? (
+                      <Text style={styles.inviteCodeText}>{formatInviteCode(inviteCode)}</Text>
+                    ) : null}
+                    <Text style={styles.mutedText}>
+                      새 코드를 발급하면 기존 코드는 바로 만료돼요.
+                    </Text>
+                    <Pressable
+                      disabled={isBusy}
+                      onPress={handleCreateInviteCode}
+                      style={({ pressed }) => [
+                        styles.actionButton,
+                        isBusy && styles.actionButtonDisabled,
+                        pressed && !isBusy && styles.actionButtonPressed,
+                      ]}
+                    >
+                      <Text style={styles.actionButtonText}>
+                        {isActionBusy("create_invite")
+                          ? "발급 중..."
+                          : inviteCode
+                            ? "새 코드 다시 발급"
+                            : "초대 코드 발급하기"}
+                      </Text>
+                    </Pressable>
+                    {isInviteRotateConfirming ? (
+                      <View style={styles.confirmCard}>
+                        <Text style={styles.confirmText}>
+                          기존 코드를 공유한 사람이 있다면 새 코드로 다시 안내해 주세요.
+                        </Text>
+                        <View style={styles.confirmActionRow}>
+                          <Pressable
+                            disabled={isBusy}
+                            onPress={() => {
+                              setIsInviteRotateConfirming(false);
+                              setSuccessMessage("");
+                            }}
+                            style={({ pressed }) => [
+                              styles.confirmCancelButton,
+                              isBusy && styles.secondaryButtonDisabled,
+                              pressed && !isBusy && styles.secondaryButtonPressed,
+                            ]}
+                          >
+                            <Text style={styles.confirmCancelButtonText}>취소</Text>
+                          </Pressable>
+                          <Pressable
+                            disabled={isBusy}
+                            onPress={handleCreateInviteCode}
+                            style={({ pressed }) => [
+                              styles.confirmPrimaryButton,
+                              isBusy && styles.actionButtonDisabled,
+                              pressed && !isBusy && styles.actionButtonPressed,
+                            ]}
+                          >
+                            <Text style={styles.confirmPrimaryButtonText}>새 코드 발급 진행</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    ) : null}
+                    {inviteCode ? (
+                      <Pressable
+                        disabled={isBusy}
+                        onPress={handleShareInviteCode}
+                        style={({ pressed }) => [
+                          styles.secondaryButton,
+                          isBusy && styles.secondaryButtonDisabled,
+                          pressed && !isBusy && styles.secondaryButtonPressed,
+                        ]}
+                      >
+                        <Text style={styles.secondaryButtonText}>
+                          {isActionBusy("share_invite") ? "공유 중..." : "초대 코드 공유하기"}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </>
+                ) : (
+                  <Text style={styles.mutedText}>현재 계정은 멤버 권한이라 초대 코드를 만들 수 없어요.</Text>
+                )}
                 <TextInput
-                  onChangeText={setMeetupTitle}
-                  placeholder="새 모임 제목"
+                  autoCapitalize="characters"
+                  onChangeText={(next) => {
+                    setJoinCode(normalizeInviteCode(next));
+                  }}
+                  placeholder="참여 코드 입력 (예: ABCD-1234)"
                   placeholderTextColor={colors.textSecondary}
                   style={styles.input}
-                  value={meetupTitle}
+                  value={formatInviteCode(joinCode)}
                 />
                 <Pressable
-                  disabled={isBusy || meetupTitle.trim().length === 0}
-                  onPress={handleCreateMeetup}
+                  disabled={isBusy || joinCode.trim().length === 0}
+                  onPress={handleJoinByCode}
                   style={({ pressed }) => [
                     styles.actionButton,
-                    (isBusy || meetupTitle.trim().length === 0) && styles.actionButtonDisabled,
+                    (isBusy || joinCode.trim().length === 0) && styles.actionButtonDisabled,
                     pressed &&
-                      !(isBusy || meetupTitle.trim().length === 0) &&
+                      !(isBusy || joinCode.trim().length === 0) &&
                       styles.actionButtonPressed,
                   ]}
                 >
                   <Text style={styles.actionButtonText}>
-                    {isActionBusy("create_meetup") ? "저장 중..." : "모임 추가"}
+                    {isActionBusy("join_circle") ? "참여 중..." : "코드로 참여"}
                   </Text>
-                </Pressable>
-              </View>
-            </View>
-
-            {showFirstPieceNudge ? (
-              <View style={styles.onboardingCard}>
-                <Text style={styles.onboardingTitle}>참여 완료! 첫 조각을 남겨볼까요?</Text>
-                <Text style={styles.onboardingBody}>
-                  지금 한 줄만 적어도 모임 피드에 바로 공유돼요.
-                </Text>
-                <Pressable
-                  disabled={isBusy}
-                  onPress={handleStartFirstPiece}
-                  style={({ pressed }) => [
-                    styles.actionButton,
-                    isBusy && styles.actionButtonDisabled,
-                    pressed && !isBusy && styles.actionButtonPressed,
-                  ]}
-                >
-                  <Text style={styles.actionButtonText}>첫 조각 작성하기</Text>
                 </Pressable>
               </View>
             ) : null}
 
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionLabel}>기억 조각 추가</Text>
-              <TextInput
-                ref={pieceInputRef}
-                multiline
-                onChangeText={setPieceBody}
-                placeholder="새 기억 조각"
-                placeholderTextColor={colors.textSecondary}
-                style={[styles.input, styles.multilineInput]}
-                value={pieceBody}
-              />
-              <Pressable
-                disabled={isBusy || pieceBody.trim().length === 0}
-                onPress={handleCreatePiece}
-                style={({ pressed }) => [
-                  styles.actionButton,
-                  (isBusy || pieceBody.trim().length === 0) && styles.actionButtonDisabled,
-                  pressed &&
-                    !(isBusy || pieceBody.trim().length === 0) &&
-                    styles.actionButtonPressed,
-                ]}
-              >
-                <Text style={styles.actionButtonText}>
-                  {isActionBusy("create_piece") ? "저장 중..." : "조각 저장"}
-                </Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionLabel}>다가오는 모임</Text>
-              {meetups.length === 0 ? (
-                <Text style={styles.mutedText}>아직 등록된 모임이 없어요. 위에서 첫 모임을 만들어보세요.</Text>
-              ) : (
-                meetups.map((meetup) => (
-                  <MeetupDetailScreen
-                    key={meetup.id}
-                    meetup={{ id: meetup.id, title: meetup.title }}
-                    pieces={pieces}
-                    currentUserId={userId}
+            {homeFocusPanel === "meetup" ? (
+              <>
+                <View style={styles.sectionCard}>
+                  <Text style={styles.sectionLabel}>새 모임 일정 추가</Text>
+                  <TextInput
+                    onChangeText={setMeetupTitle}
+                    placeholder="새 모임 제목"
+                    placeholderTextColor={colors.textSecondary}
+                    style={styles.input}
+                    value={meetupTitle}
                   />
-                ))
-              )}
-            </View>
+                  <Pressable
+                    disabled={isBusy || meetupTitle.trim().length === 0}
+                    onPress={handleCreateMeetup}
+                    style={({ pressed }) => [
+                      styles.actionButton,
+                      (isBusy || meetupTitle.trim().length === 0) && styles.actionButtonDisabled,
+                      pressed &&
+                        !(isBusy || meetupTitle.trim().length === 0) &&
+                        styles.actionButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.actionButtonText}>
+                      {isActionBusy("create_meetup") ? "저장 중..." : "모임 추가"}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                <View style={styles.sectionCard}>
+                  <Text style={styles.sectionLabel}>다가오는 모임</Text>
+                  {meetups.length === 0 ? (
+                    <Text style={styles.mutedText}>
+                      아직 등록된 모임이 없어요. 위에서 첫 모임을 만들어보세요.
+                    </Text>
+                  ) : (
+                    meetups.map((meetup) => (
+                      <MeetupDetailScreen
+                        key={meetup.id}
+                        meetup={{ id: meetup.id, title: meetup.title }}
+                        pieces={pieces}
+                        currentUserId={userId}
+                      />
+                    ))
+                  )}
+                </View>
+              </>
+            ) : null}
+
+            {homeFocusPanel === "members" ? (
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionLabel}>모임 멤버</Text>
+                {members.length === 0 ? (
+                  <Text style={styles.mutedText}>아직 멤버 정보를 불러오지 못했어요.</Text>
+                ) : (
+                  <View style={styles.memberList}>
+                    {orderedMembers.map((member) => (
+                      <View key={member.userId} style={styles.memberRow}>
+                        <Text style={styles.memberNameText}>
+                          {member.userId === userId
+                            ? "나"
+                            : `사용자 ${member.userId.slice(0, 6).toUpperCase()}`}
+                        </Text>
+                        <View
+                          style={[
+                            styles.memberRoleBadge,
+                            member.role === "admin"
+                              ? styles.memberRoleBadgeAdmin
+                              : styles.memberRoleBadgeMember,
+                          ]}
+                        >
+                          <Text style={styles.memberRoleBadgeText}>
+                            {member.role === "admin" ? "관리자" : "멤버"}
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            ) : null}
           </>
         ) : null}
 
@@ -1062,11 +1148,31 @@ const styles = StyleSheet.create({
   tabButtonTextActive: {
     color: "#fff",
   },
-  sectionGrid: {
-    gap: 14,
-  },
-  sectionGridDesktop: {
+  focusTabRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  focusTabButton: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  focusTabButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  focusTabButtonText: {
+    color: colors.textPrimary,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  focusTabButtonTextActive: {
+    color: "#fff",
   },
   sectionCard: {
     backgroundColor: colors.surface,
