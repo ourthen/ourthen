@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import {
   ActivityIndicator,
   Keyboard,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -114,21 +116,26 @@ function formatMeetupScheduleLabel(value: string | null): string {
   ).padStart(2, "0")}`;
 }
 
-function buildScheduledAt(dateInput: string, timeInput: string): string | null {
-  const datePart = dateInput.trim();
-  const timePart = timeInput.trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
-    return null;
+function formatPickerDate(value: Date | null): string {
+  if (!value) {
+    return "날짜 선택";
   }
-  if (!/^\d{2}:\d{2}$/.test(timePart)) {
-    return null;
-  }
+  return value.toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  });
+}
 
-  const date = new Date(`${datePart}T${timePart}:00`);
-  if (Number.isNaN(date.getTime())) {
-    return null;
+function formatPickerTime(value: Date | null): string {
+  if (!value) {
+    return "시간 선택";
   }
-  return date.toISOString();
+  return value.toLocaleTimeString("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function CircleHomeScreen({
@@ -146,8 +153,9 @@ export function CircleHomeScreen({
   const [joinCode, setJoinCode] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [meetupTitle, setMeetupTitle] = useState("");
-  const [meetupDateInput, setMeetupDateInput] = useState("");
-  const [meetupTimeInput, setMeetupTimeInput] = useState("");
+  const [meetupScheduledAt, setMeetupScheduledAt] = useState<Date | null>(null);
+  const [showMeetupDatePicker, setShowMeetupDatePicker] = useState(false);
+  const [showMeetupTimePicker, setShowMeetupTimePicker] = useState(false);
   const [pieceBody, setPieceBody] = useState("");
   const [activeView, setActiveView] = useState<HomeView>("feed");
   const [emptyStateMode, setEmptyStateMode] = useState<"create" | "join">("create");
@@ -459,15 +467,20 @@ export function CircleHomeScreen({
       setBusyAction("create_meetup");
       setErrorMessage("");
       setSuccessMessage("");
-      const scheduledAt = buildScheduledAt(meetupDateInput, meetupTimeInput);
-      if (!scheduledAt) {
-        throw new Error("날짜는 YYYY-MM-DD, 시간은 HH:MM 형식으로 입력해 주세요.");
+      if (!meetupScheduledAt) {
+        throw new Error("모임 날짜와 시간을 선택해 주세요.");
       }
 
-      await service.createMeetup(selectedCircleId, userId, meetupTitle, scheduledAt);
+      await service.createMeetup(
+        selectedCircleId,
+        userId,
+        meetupTitle,
+        meetupScheduledAt.toISOString(),
+      );
       setMeetupTitle("");
-      setMeetupDateInput("");
-      setMeetupTimeInput("");
+      setMeetupScheduledAt(null);
+      setShowMeetupDatePicker(false);
+      setShowMeetupTimePicker(false);
       await loadCircleContent(selectedCircleId);
       setActiveView("meetup");
       setSuccessMessage("모임 일정을 추가했어요.");
@@ -542,6 +555,36 @@ export function CircleHomeScreen({
     setTimeout(() => {
       pieceInputRef.current?.focus();
     }, 40);
+  };
+
+  const handleMeetupDatePicked = (event: DateTimePickerEvent, value?: Date) => {
+    if (Platform.OS === "android") {
+      setShowMeetupDatePicker(false);
+    }
+    if (event.type === "dismissed" || !value) {
+      return;
+    }
+
+    setMeetupScheduledAt((previous) => {
+      const next = previous ? new Date(previous) : new Date();
+      next.setFullYear(value.getFullYear(), value.getMonth(), value.getDate());
+      return next;
+    });
+  };
+
+  const handleMeetupTimePicked = (event: DateTimePickerEvent, value?: Date) => {
+    if (Platform.OS === "android") {
+      setShowMeetupTimePicker(false);
+    }
+    if (event.type === "dismissed" || !value) {
+      return;
+    }
+
+    setMeetupScheduledAt((previous) => {
+      const next = previous ? new Date(previous) : new Date();
+      next.setHours(value.getHours(), value.getMinutes(), 0, 0);
+      return next;
+    });
   };
 
   return (
@@ -1070,42 +1113,70 @@ export function CircleHomeScreen({
                   style={styles.input}
                   value={meetupTitle}
                 />
-                <TextInput
-                  autoCapitalize="none"
-                  onChangeText={setMeetupDateInput}
-                  placeholder="날짜 (YYYY-MM-DD)"
-                  placeholderTextColor={colors.textSecondary}
-                  style={styles.input}
-                  value={meetupDateInput}
-                />
-                <TextInput
-                  autoCapitalize="none"
-                  onChangeText={setMeetupTimeInput}
-                  placeholder="시간 (HH:MM)"
-                  placeholderTextColor={colors.textSecondary}
-                  style={styles.input}
-                  value={meetupTimeInput}
-                />
+                <View style={styles.pickerActionRow}>
+                  <Pressable
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setShowMeetupTimePicker(false);
+                      setShowMeetupDatePicker((previous) => !previous);
+                    }}
+                    style={({ pressed }) => [
+                      styles.secondaryButton,
+                      styles.pickerActionButton,
+                      pressed && styles.secondaryButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.secondaryButtonText}>{formatPickerDate(meetupScheduledAt)}</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setShowMeetupDatePicker(false);
+                      setShowMeetupTimePicker((previous) => !previous);
+                    }}
+                    style={({ pressed }) => [
+                      styles.secondaryButton,
+                      styles.pickerActionButton,
+                      pressed && styles.secondaryButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.secondaryButtonText}>{formatPickerTime(meetupScheduledAt)}</Text>
+                  </Pressable>
+                </View>
+                {showMeetupDatePicker ? (
+                  <DateTimePicker
+                    mode="date"
+                    display={Platform.OS === "ios" ? "inline" : "default"}
+                    onChange={handleMeetupDatePicked}
+                    value={meetupScheduledAt ?? new Date()}
+                  />
+                ) : null}
+                {showMeetupTimePicker ? (
+                  <DateTimePicker
+                    mode="time"
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
+                    onChange={handleMeetupTimePicked}
+                    value={meetupScheduledAt ?? new Date()}
+                  />
+                ) : null}
+                <Text style={styles.mutedText}>선택된 일정: {formatPickerDate(meetupScheduledAt)} {formatPickerTime(meetupScheduledAt)}</Text>
                 <Pressable
                   disabled={
                     isBusy ||
                     meetupTitle.trim().length === 0 ||
-                    meetupDateInput.trim().length === 0 ||
-                    meetupTimeInput.trim().length === 0
+                    meetupScheduledAt === null
                   }
                   onPress={handleCreateMeetup}
                   style={({ pressed }) => [
                     styles.actionButton,
                     (isBusy ||
                       meetupTitle.trim().length === 0 ||
-                      meetupDateInput.trim().length === 0 ||
-                      meetupTimeInput.trim().length === 0) &&
+                      meetupScheduledAt === null) &&
                       styles.actionButtonDisabled,
                     pressed &&
                       !(isBusy ||
                         meetupTitle.trim().length === 0 ||
-                        meetupDateInput.trim().length === 0 ||
-                        meetupTimeInput.trim().length === 0) &&
+                        meetupScheduledAt === null) &&
                       styles.actionButtonPressed,
                   ]}
                 >
@@ -1426,6 +1497,13 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: colors.textPrimary,
     fontWeight: "700",
+  },
+  pickerActionRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  pickerActionButton: {
+    flex: 1,
   },
   confirmCard: {
     backgroundColor: "#fff8ea",
