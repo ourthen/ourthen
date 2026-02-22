@@ -1,6 +1,7 @@
 import {
   createCircleInviteCode,
   createCircleWithMembership,
+  fetchCircleMembers,
   fetchLatestCircleInviteCode,
   joinCircleByInviteCode,
   mapCircleRows,
@@ -105,5 +106,34 @@ describe("circleService", () => {
       p_circle_id: "circle-1",
     });
     expect(code).toBe("EFGH5678");
+  });
+
+  it("loads members for a circle", async () => {
+    const order = jest.fn().mockResolvedValue({
+      data: [
+        { user_id: "u1", role: "admin", joined_at: "2026-02-23T12:00:00.000Z" },
+        { user_id: "u2", role: "member", joined_at: "2026-02-24T12:00:00.000Z" },
+      ],
+      error: null,
+    });
+    const eq = jest.fn().mockReturnValue({ order });
+    const select = jest.fn().mockReturnValue({ eq });
+
+    (supabase.from as jest.Mock).mockImplementation((table: string) => {
+      if (table === "circle_members") {
+        return { select };
+      }
+      return {};
+    });
+
+    const members = await fetchCircleMembers("circle-1");
+
+    expect(supabase.from).toHaveBeenCalledWith("circle_members");
+    expect(select).toHaveBeenCalledWith("user_id, role, joined_at");
+    expect(eq).toHaveBeenCalledWith("circle_id", "circle-1");
+    expect(members).toEqual([
+      { userId: "u1", role: "admin", joinedAt: "2026-02-23T12:00:00.000Z" },
+      { userId: "u2", role: "member", joinedAt: "2026-02-24T12:00:00.000Z" },
+    ]);
   });
 });

@@ -2,9 +2,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react-nativ
 import { CircleHomeScreen } from "../CircleHomeScreen";
 
 const createServiceMock = () => ({
-  fetchMyCircles: jest.fn(),
-  fetchMeetupsByCircle: jest.fn(),
-  fetchPiecesByCircle: jest.fn(),
+  fetchMyCircles: jest.fn().mockResolvedValue([]),
+  fetchMeetupsByCircle: jest.fn().mockResolvedValue([]),
+  fetchCircleMembers: jest.fn().mockResolvedValue([]),
+  fetchPiecesByCircle: jest.fn().mockResolvedValue([]),
   createCircleWithMembership: jest.fn(),
   createCircleInviteCode: jest.fn(),
   fetchLatestCircleInviteCode: jest.fn().mockResolvedValue(null),
@@ -32,6 +33,9 @@ describe("CircleHomeScreen", () => {
     service.fetchMeetupsByCircle.mockResolvedValue([
       { id: "m1", title: "금요일 저녁 모임", status: "planned" },
     ]);
+    service.fetchCircleMembers.mockResolvedValue([
+      { userId: "user-1", role: "admin", joinedAt: "2026-02-23T12:00:00.000Z" },
+    ]);
     service.fetchPiecesByCircle.mockResolvedValue([{ id: "p1", label: "첫 기억" }]);
 
     render(<CircleHomeScreen userId="user-1" service={service} />);
@@ -40,6 +44,8 @@ describe("CircleHomeScreen", () => {
       expect(screen.getAllByText("우리 모임").length).toBeGreaterThan(0);
       expect(screen.getByText("금요일 저녁 모임")).toBeTruthy();
       expect(screen.getAllByText("첫 기억").length).toBeGreaterThan(0);
+      expect(screen.getByText("모임 멤버")).toBeTruthy();
+      expect(screen.getByText("나")).toBeTruthy();
     });
   });
 
@@ -70,6 +76,9 @@ describe("CircleHomeScreen", () => {
       role: "member",
     });
     service.fetchMeetupsByCircle.mockResolvedValue([]);
+    service.fetchCircleMembers.mockResolvedValue([
+      { userId: "user-1", role: "member", joinedAt: "2026-02-23T12:00:00.000Z" },
+    ]);
     service.fetchPiecesByCircle.mockResolvedValue([]);
 
     render(<CircleHomeScreen userId="user-1" service={service} />);
@@ -88,6 +97,7 @@ describe("CircleHomeScreen", () => {
     await waitFor(() => {
       expect(service.joinCircleByInviteCode).toHaveBeenCalledWith("ABCD1234");
       expect(service.fetchMeetupsByCircle).toHaveBeenCalledWith("c2");
+      expect(service.fetchCircleMembers).toHaveBeenCalledWith("c2");
       expect(service.fetchPiecesByCircle).toHaveBeenCalledWith("c2");
       expect(screen.getAllByText("우리 동네 팀").length).toBeGreaterThan(0);
       expect(screen.getByText("모임에 참여했어요.")).toBeTruthy();
@@ -98,6 +108,9 @@ describe("CircleHomeScreen", () => {
     const service = createServiceMock();
     service.fetchMyCircles.mockResolvedValue([{ id: "c1", name: "동네 친구", role: "member" }]);
     service.fetchMeetupsByCircle.mockResolvedValue([]);
+    service.fetchCircleMembers.mockResolvedValue([
+      { userId: "user-1", role: "member", joinedAt: "2026-02-23T12:00:00.000Z" },
+    ]);
     service.fetchPiecesByCircle.mockResolvedValue([]);
 
     render(<CircleHomeScreen userId="user-1" service={service} />);
@@ -114,6 +127,9 @@ describe("CircleHomeScreen", () => {
     const service = createServiceMock();
     service.fetchMyCircles.mockResolvedValue([{ id: "c1", name: "우리 모임", role: "admin" }]);
     service.fetchMeetupsByCircle.mockResolvedValue([]);
+    service.fetchCircleMembers.mockResolvedValue([
+      { userId: "user-1", role: "admin", joinedAt: "2026-02-23T12:00:00.000Z" },
+    ]);
     service.fetchPiecesByCircle.mockResolvedValue([]);
     service.fetchLatestCircleInviteCode.mockResolvedValue("ZXCV1234");
 
@@ -131,6 +147,7 @@ describe("CircleHomeScreen", () => {
       .mockResolvedValueOnce([{ id: "c1", name: "우리 모임", role: "admin" }])
       .mockResolvedValueOnce([{ id: "c1", name: "우리 모임", role: "admin" }]);
     service.fetchMeetupsByCircle.mockResolvedValue([]);
+    service.fetchCircleMembers.mockResolvedValue([]);
     service.fetchPiecesByCircle.mockResolvedValue([]);
 
     render(<CircleHomeScreen userId="user-1" service={service} />);

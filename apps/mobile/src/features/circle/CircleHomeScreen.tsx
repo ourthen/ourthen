@@ -21,6 +21,7 @@ import * as circleService from "./circleService";
 type CircleHomeService = {
   fetchMyCircles: typeof circleService.fetchMyCircles;
   fetchMeetupsByCircle: typeof circleService.fetchMeetupsByCircle;
+  fetchCircleMembers: typeof circleService.fetchCircleMembers;
   fetchPiecesByCircle: typeof circleService.fetchPiecesByCircle;
   createCircleWithMembership: typeof circleService.createCircleWithMembership;
   createCircleInviteCode: typeof circleService.createCircleInviteCode;
@@ -39,6 +40,7 @@ type CircleHomeScreenProps = {
 const defaultService: CircleHomeService = {
   fetchMyCircles: circleService.fetchMyCircles,
   fetchMeetupsByCircle: circleService.fetchMeetupsByCircle,
+  fetchCircleMembers: circleService.fetchCircleMembers,
   fetchPiecesByCircle: circleService.fetchPiecesByCircle,
   createCircleWithMembership: circleService.createCircleWithMembership,
   createCircleInviteCode: circleService.createCircleInviteCode,
@@ -98,6 +100,7 @@ export function CircleHomeScreen({
   const [circles, setCircles] = useState<circleService.CircleSummary[]>([]);
   const [selectedCircleId, setSelectedCircleId] = useState<string | null>(null);
   const [meetups, setMeetups] = useState<circleService.MeetupSummary[]>([]);
+  const [members, setMembers] = useState<circleService.CircleMemberSummary[]>([]);
   const [pieces, setPieces] = useState<circleService.PieceSummary[]>([]);
   const [circleName, setCircleName] = useState("");
   const [joinCode, setJoinCode] = useState("");
@@ -127,12 +130,14 @@ export function CircleHomeScreen({
 
   const loadCircleContent = useCallback(
     async (circleId: string) => {
-      const [nextMeetups, nextPieces] = await Promise.all([
+      const [nextMeetups, nextMembers, nextPieces] = await Promise.all([
         service.fetchMeetupsByCircle(circleId),
+        service.fetchCircleMembers(circleId),
         service.fetchPiecesByCircle(circleId),
       ]);
 
       setMeetups(nextMeetups);
+      setMembers(nextMembers);
       setPieces(nextPieces);
     },
     [service],
@@ -152,6 +157,7 @@ export function CircleHomeScreen({
         await loadCircleContent(nextCircleId);
       } else {
         setMeetups([]);
+        setMembers([]);
         setPieces([]);
       }
     } catch (error) {
@@ -613,6 +619,42 @@ export function CircleHomeScreen({
                   </Pressable>
                 ))}
               </View>
+              <View style={styles.memberSummaryRow}>
+                <Text style={styles.memberSummaryText}>
+                  멤버 {members.length}명
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionLabel}>모임 멤버</Text>
+              {members.length === 0 ? (
+                <Text style={styles.mutedText}>아직 멤버 정보를 불러오지 못했어요.</Text>
+              ) : (
+                <View style={styles.memberList}>
+                  {members.map((member) => (
+                    <View key={member.userId} style={styles.memberRow}>
+                      <Text style={styles.memberNameText}>
+                        {member.userId === userId
+                          ? "나"
+                          : `사용자 ${member.userId.slice(0, 6).toUpperCase()}`}
+                      </Text>
+                      <View
+                        style={[
+                          styles.memberRoleBadge,
+                          member.role === "admin"
+                            ? styles.memberRoleBadgeAdmin
+                            : styles.memberRoleBadgeMember,
+                        ]}
+                      >
+                        <Text style={styles.memberRoleBadgeText}>
+                          {member.role === "admin" ? "관리자" : "멤버"}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
 
             <View style={styles.sectionCard}>
@@ -1046,6 +1088,48 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+  },
+  memberSummaryRow: {
+    alignItems: "flex-end",
+  },
+  memberSummaryText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  memberList: {
+    gap: 8,
+  },
+  memberRow: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  memberNameText: {
+    color: colors.textPrimary,
+    fontWeight: "700",
+  },
+  memberRoleBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  memberRoleBadgeAdmin: {
+    backgroundColor: "#fff3dc",
+  },
+  memberRoleBadgeMember: {
+    backgroundColor: "#ebf4ff",
+  },
+  memberRoleBadgeText: {
+    color: colors.textPrimary,
+    fontSize: 11,
+    fontWeight: "700",
   },
   circleChip: {
     backgroundColor: colors.surfaceMuted,

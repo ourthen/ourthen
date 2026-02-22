@@ -29,6 +29,12 @@ export type MeetupSummary = {
   status: string;
 };
 
+export type CircleMemberSummary = {
+  userId: string;
+  role: CircleRole;
+  joinedAt: string | null;
+};
+
 export type PieceSummary = {
   id: string;
   label: string;
@@ -192,6 +198,30 @@ export async function fetchMeetupsByCircle(circleId: string): Promise<MeetupSumm
       }),
     ) ?? []
   );
+}
+
+export async function fetchCircleMembers(
+  circleId: string,
+): Promise<CircleMemberSummary[]> {
+  const { data, error } = await supabase
+    .from("circle_members")
+    .select("user_id, role, joined_at")
+    .eq("circle_id", circleId)
+    .order("joined_at", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  const rows =
+    (data as Array<{ user_id: string; role: CircleRole; joined_at: string | null }> | null) ??
+    [];
+
+  return rows.map((row) => ({
+    userId: row.user_id,
+    role: row.role,
+    joinedAt: row.joined_at,
+  }));
 }
 
 type RawPieceRow = {
