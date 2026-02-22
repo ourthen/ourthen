@@ -1,4 +1,6 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { Keyboard } from "react-native";
 import { EmailOtpAuthScreen } from "../EmailOtpAuthScreen";
 import * as authService from "../authService";
 
@@ -8,8 +10,9 @@ jest.mock("../authService", () => ({
 }));
 
 describe("EmailOtpAuthScreen", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
+    await AsyncStorage.clear();
     (authService.requestEmailOtp as jest.Mock).mockResolvedValue(undefined);
     (authService.verifyEmailOtp as jest.Mock).mockResolvedValue(undefined);
   });
@@ -40,5 +43,36 @@ describe("EmailOtpAuthScreen", () => {
     await waitFor(() => {
       expect(authService.verifyEmailOtp).toHaveBeenCalledWith("test@example.com", "12345678");
     });
+  });
+
+  it("shows recent email suggestions and applies selected email", async () => {
+    await AsyncStorage.setItem(
+      "@ourthen/email-history",
+      JSON.stringify(["old1@example.com", "old2@example.com"]),
+    );
+
+    render(<EmailOtpAuthScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText("최근 사용 이메일")).toBeTruthy();
+      expect(screen.getByText("old1@example.com")).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText("old1@example.com"));
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("old1@example.com")).toBeTruthy();
+    });
+  });
+
+  it("dismisses keyboard with dedicated action", async () => {
+    const dismissSpy = jest.spyOn(Keyboard, "dismiss").mockImplementation(() => {});
+
+    render(<EmailOtpAuthScreen />);
+
+    fireEvent.press(screen.getByText("키보드 내리기"));
+
+    expect(dismissSpy).toHaveBeenCalled();
+    dismissSpy.mockRestore();
   });
 });

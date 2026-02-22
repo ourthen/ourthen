@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -198,6 +199,9 @@ export function CircleHomeScreen({
           paddingHorizontal: layout.horizontalPadding,
         },
       ]}
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
+      onScrollBeginDrag={Keyboard.dismiss}
     >
       <View style={[styles.content, { maxWidth: layout.contentMaxWidth }]}>
         <View style={styles.heroCard}>

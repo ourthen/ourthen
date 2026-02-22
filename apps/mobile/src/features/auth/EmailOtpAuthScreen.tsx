@@ -1,11 +1,24 @@
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useResponsiveLayout } from "../../core/ui/layout";
 import { colors, radii } from "../../core/ui/tokens";
 import { requestEmailOtp, verifyEmailOtp } from "./authService";
 
 type Step = "email" | "code";
 const OTP_LENGTH = 8;
+const EMAIL_HISTORY_KEY = "@ourthen/email-history";
+const EMAIL_HISTORY_LIMIT = 5;
 
 export function EmailOtpAuthScreen() {
   const layout = useResponsiveLayout();
@@ -14,6 +27,52 @@ export function EmailOtpAuthScreen() {
   const [code, setCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [recentEmails, setRecentEmails] = useState<string[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    void (async () => {
+      const raw = await AsyncStorage.getItem(EMAIL_HISTORY_KEY);
+      if (!raw || !mounted) {
+        return;
+      }
+      try {
+        const parsed = JSON.parse(raw) as string[];
+        if (Array.isArray(parsed)) {
+          setRecentEmails(parsed.filter((value) => typeof value === "string").slice(0, EMAIL_HISTORY_LIMIT));
+        }
+      } catch {
+        setRecentEmails([]);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const filteredRecentEmails = useMemo(() => {
+    const q = email.trim().toLowerCase();
+    if (!q) {
+      return recentEmails;
+    }
+    return recentEmails.filter((value) => value.toLowerCase().includes(q));
+  }, [email, recentEmails]);
+
+  const saveEmailHistory = async (value: string) => {
+    const trimmed = value.trim().toLowerCase();
+    if (!trimmed) {
+      return;
+    }
+
+    const next = [trimmed, ...recentEmails.filter((item) => item !== trimmed)].slice(
+      0,
+      EMAIL_HISTORY_LIMIT,
+    );
+    setRecentEmails(next);
+    await AsyncStorage.setItem(EMAIL_HISTORY_KEY, JSON.stringify(next));
+  };
 
   const handleSendCode = async () => {
     if (!email.trim()) {
@@ -25,6 +84,7 @@ export function EmailOtpAuthScreen() {
       setIsLoading(true);
       setErrorMessage("");
       await requestEmailOtp(email.trim());
+      await saveEmailHistory(email);
       setStep("code");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "인증코드 전송에 실패했어요.");
@@ -56,76 +116,136 @@ export function EmailOtpAuthScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      <View style={styles.decorationLarge} />
-      <View style={styles.decorationSmall} />
-
-      <View
-        style={[
-          styles.card,
-          {
-            maxWidth: layout.contentMaxWidth,
-            paddingHorizontal: layout.cardPadding,
-            paddingVertical: layout.cardPadding + 2,
-          },
-        ]}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={styles.keyboardRoot}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.header}>
-          <Text style={styles.badge}>K-서비스 베타</Text>
-          <Text style={styles.title}>로그인</Text>
-          <Text style={styles.subtitle}>이메일 인증으로 안전하게 시작해요.</Text>
-        </View>
+        <Pressable
+          onPress={Keyboard.dismiss}
+          style={styles.screen}
+        >
+          <View style={styles.decorationLarge} />
+          <View style={styles.decorationSmall} />
 
-        {step === "email" ? (
-          <View style={styles.form}>
-            <TextInput
-              autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              onChangeText={setEmail}
-              placeholder="이메일"
-              placeholderTextColor={colors.textSecondary}
-              style={styles.input}
-              value={email}
-            />
-            <Pressable onPress={handleSendCode} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
-              <Text style={styles.buttonText}>{isLoading ? "전송 중..." : "인증코드 받기"}</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.form}>
-            <Text style={styles.caption}>{email}로 인증코드를 보냈어요.</Text>
-            <TextInput
-              keyboardType="number-pad"
-              onChangeText={setCode}
-              placeholder={`${OTP_LENGTH}자리 인증코드`}
-              placeholderTextColor={colors.textSecondary}
-              style={styles.input}
-              value={code}
-            />
-            <Pressable onPress={handleVerifyCode} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
-              <Text style={styles.buttonText}>{isLoading ? "확인 중..." : "인증하기"}</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                setStep("email");
-                setCode("");
-                setErrorMessage("");
-              }}
-              style={styles.linkButton}
-            >
-              <Text style={styles.linkText}>이메일 다시 입력</Text>
-            </Pressable>
-          </View>
-        )}
+          <Pressable
+            onPress={(event) => {
+              event.stopPropagation();
+            }}
+            style={[
+              styles.card,
+              {
+                maxWidth: layout.contentMaxWidth,
+                paddingHorizontal: layout.cardPadding,
+                paddingVertical: layout.cardPadding + 2,
+              },
+            ]}
+          >
+            <View style={styles.header}>
+              <Text style={styles.badge}>K-서비스 베타</Text>
+              <Text style={styles.title}>로그인</Text>
+              <Text style={styles.subtitle}>이메일 인증으로 안전하게 시작해요.</Text>
+            </View>
 
-        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-      </View>
-    </View>
+            {step === "email" ? (
+              <View style={styles.form}>
+                <TextInput
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  onChangeText={setEmail}
+                  onSubmitEditing={Keyboard.dismiss}
+                  placeholder="이메일"
+                  placeholderTextColor={colors.textSecondary}
+                  returnKeyType="done"
+                  style={styles.input}
+                  textContentType="emailAddress"
+                  value={email}
+                />
+                {filteredRecentEmails.length > 0 ? (
+                  <View style={styles.suggestionWrap}>
+                    <Text style={styles.suggestionTitle}>최근 사용 이메일</Text>
+                    <View style={styles.suggestionList}>
+                      {filteredRecentEmails.map((item) => (
+                        <Pressable
+                          key={item}
+                          onPress={() => {
+                            setEmail(item);
+                            Keyboard.dismiss();
+                          }}
+                          style={({ pressed }) => [
+                            styles.suggestionItem,
+                            pressed && styles.suggestionItemPressed,
+                          ]}
+                        >
+                          <Text style={styles.suggestionText}>{item}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+                <Pressable
+                  onPress={handleSendCode}
+                  style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+                >
+                  <Text style={styles.buttonText}>{isLoading ? "전송 중..." : "인증코드 받기"}</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.form}>
+                <Text style={styles.caption}>{email}로 인증코드를 보냈어요.</Text>
+                <TextInput
+                  keyboardType="number-pad"
+                  onChangeText={setCode}
+                  onSubmitEditing={Keyboard.dismiss}
+                  placeholder={`${OTP_LENGTH}자리 인증코드`}
+                  placeholderTextColor={colors.textSecondary}
+                  returnKeyType="done"
+                  style={styles.input}
+                  value={code}
+                />
+                <Pressable
+                  onPress={handleVerifyCode}
+                  style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+                >
+                  <Text style={styles.buttonText}>{isLoading ? "확인 중..." : "인증하기"}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setStep("email");
+                    setCode("");
+                    setErrorMessage("");
+                  }}
+                  style={styles.linkButton}
+                >
+                  <Text style={styles.linkText}>이메일 다시 입력</Text>
+                </Pressable>
+              </View>
+            )}
+
+            <Pressable onPress={Keyboard.dismiss} style={styles.dismissKeyboardButton}>
+              <Text style={styles.dismissKeyboardText}>키보드 내리기</Text>
+            </Pressable>
+            {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+          </Pressable>
+        </Pressable>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardRoot: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
   screen: {
     alignItems: "center",
     flex: 1,
@@ -192,6 +312,35 @@ const styles = StyleSheet.create({
   form: {
     gap: 12,
   },
+  suggestionWrap: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    padding: 10,
+  },
+  suggestionTitle: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  suggestionList: {
+    gap: 6,
+  },
+  suggestionItem: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radii.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  suggestionItemPressed: {
+    opacity: 0.75,
+  },
+  suggestionText: {
+    color: colors.textPrimary,
+    fontSize: 13,
+  },
   input: {
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.border,
@@ -223,6 +372,14 @@ const styles = StyleSheet.create({
   },
   linkText: {
     color: colors.primary,
+    fontWeight: "600",
+  },
+  dismissKeyboardButton: {
+    alignSelf: "flex-end",
+  },
+  dismissKeyboardText: {
+    color: colors.textSecondary,
+    fontSize: 12,
     fontWeight: "600",
   },
   error: {
