@@ -145,4 +145,28 @@ describe("CircleHomeScreen", () => {
       expect(service.fetchMyCircles).toHaveBeenCalledTimes(2);
     });
   });
+
+  it("shows retry action when initial load fails", async () => {
+    const service = createServiceMock();
+    service.fetchMyCircles
+      .mockRejectedValueOnce(new Error("Failed to fetch"))
+      .mockResolvedValueOnce([]);
+    service.fetchMeetupsByCircle.mockResolvedValue([]);
+    service.fetchPiecesByCircle.mockResolvedValue([]);
+
+    render(<CircleHomeScreen userId="user-1" service={service} />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("네트워크가 불안정해요. 연결을 확인한 뒤 다시 시도해 주세요."),
+      ).toBeTruthy();
+      expect(screen.getByText("다시 시도")).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText("다시 시도"));
+
+    await waitFor(() => {
+      expect(service.fetchMyCircles).toHaveBeenCalledTimes(2);
+    });
+  });
 });

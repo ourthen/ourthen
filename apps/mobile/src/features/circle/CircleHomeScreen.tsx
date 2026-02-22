@@ -69,6 +69,10 @@ function formatInviteCode(input: string): string {
 }
 
 function messageFromError(error: unknown, fallback: string): string {
+  if (error instanceof Error && /fetch|network/i.test(error.message)) {
+    return "네트워크가 불안정해요. 연결을 확인한 뒤 다시 시도해 주세요.";
+  }
+
   if (error instanceof Error && error.message) {
     return error.message;
   }
@@ -160,6 +164,20 @@ export function CircleHomeScreen({
   useEffect(() => {
     void loadInitialData();
   }, [loadInitialData]);
+
+  useEffect(() => {
+    if (!successMessage) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      setSuccessMessage("");
+    }, 2200);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [successMessage]);
 
   useEffect(() => {
     if (!selectedCircle || selectedCircle.role !== "admin") {
@@ -758,6 +776,21 @@ export function CircleHomeScreen({
         {errorMessage ? (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{errorMessage}</Text>
+            <Pressable
+              disabled={isBusy || isRefreshing}
+              onPress={() => {
+                void handleRefresh();
+              }}
+              style={({ pressed }) => [
+                styles.errorRetryButton,
+                (isBusy || isRefreshing) && styles.errorRetryButtonDisabled,
+                pressed && !(isBusy || isRefreshing) && styles.errorRetryButtonPressed,
+              ]}
+            >
+              <Text style={styles.errorRetryButtonText}>
+                {isRefreshing ? "다시 시도 중..." : "다시 시도"}
+              </Text>
+            </Pressable>
           </View>
         ) : null}
       </View>
@@ -1054,5 +1087,25 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.danger,
     fontWeight: "600",
+  },
+  errorRetryButton: {
+    alignSelf: "flex-start",
+    backgroundColor: "#fff",
+    borderColor: "#efc8c2",
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  errorRetryButtonPressed: {
+    opacity: 0.75,
+  },
+  errorRetryButtonDisabled: {
+    opacity: 0.45,
+  },
+  errorRetryButtonText: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: "700",
   },
 });
