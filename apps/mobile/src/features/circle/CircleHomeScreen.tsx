@@ -253,9 +253,14 @@ export function CircleHomeScreen({
       setBusyAction("create_invite");
       setErrorMessage("");
       setSuccessMessage("");
+      const hadInviteCode = inviteCode.trim().length > 0;
       const code = await service.createCircleInviteCode(selectedCircleId);
       setInviteCode(code);
-      setSuccessMessage("초대 코드를 만들었어요.");
+      setSuccessMessage(
+        hadInviteCode
+          ? "새 코드를 발급했어요. 이전 코드는 만료됐어요."
+          : "초대 코드를 발급했어요.",
+      );
     } catch (error) {
       setSuccessMessage("");
       setErrorMessage(messageFromError(error, "초대 코드 생성에 실패했어요."));
@@ -667,6 +672,9 @@ export function CircleHomeScreen({
                   {inviteCode ? (
                     <Text style={styles.inviteCodeText}>{formatInviteCode(inviteCode)}</Text>
                   ) : null}
+                  <Text style={styles.mutedText}>
+                    새 코드를 발급하면 기존 코드는 바로 만료돼요.
+                  </Text>
                   <Pressable
                     disabled={isBusy}
                     onPress={handleCreateInviteCode}
@@ -677,7 +685,11 @@ export function CircleHomeScreen({
                     ]}
                   >
                     <Text style={styles.actionButtonText}>
-                      {isActionBusy("create_invite") ? "생성 중..." : "이 모임 초대 코드 만들기"}
+                      {isActionBusy("create_invite")
+                        ? "발급 중..."
+                        : inviteCode
+                          ? "새 코드 다시 발급"
+                          : "초대 코드 발급하기"}
                     </Text>
                   </Pressable>
                   {inviteCode ? (

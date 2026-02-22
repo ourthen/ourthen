@@ -120,7 +120,8 @@ describe("CircleHomeScreen", () => {
       expect(screen.getByText("현재 계정은 멤버 권한이라 초대 코드를 만들 수 없어요.")).toBeTruthy();
     });
 
-    expect(screen.queryByText("이 모임 초대 코드 만들기")).toBeNull();
+    expect(screen.queryByText("초대 코드 발급하기")).toBeNull();
+    expect(screen.queryByText("새 코드 다시 발급")).toBeNull();
   });
 
   it("loads latest invite code for admin circles", async () => {
