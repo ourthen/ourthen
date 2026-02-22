@@ -1,4 +1,9 @@
-import { createCircleWithMembership, mapCircleRows } from "../circleService";
+import {
+  createCircleInviteCode,
+  createCircleWithMembership,
+  joinCircleByInviteCode,
+  mapCircleRows,
+} from "../circleService";
 import { supabase } from "../../../lib/supabase";
 
 jest.mock("../../../lib/supabase", () => ({
@@ -50,6 +55,40 @@ describe("circleService", () => {
   it("rejects blank circle names", async () => {
     await expect(createCircleWithMembership("   ")).rejects.toEqual(
       expect.objectContaining({ message: "모임 이름을 입력해 주세요." }),
+    );
+  });
+
+  it("creates invite code via rpc", async () => {
+    (supabase.rpc as jest.Mock).mockResolvedValue({
+      data: [{ code: "ABCD1234" }],
+      error: null,
+    });
+
+    const code = await createCircleInviteCode("circle-1");
+
+    expect(supabase.rpc).toHaveBeenCalledWith("create_circle_invite_code", {
+      p_circle_id: "circle-1",
+    });
+    expect(code).toBe("ABCD1234");
+  });
+
+  it("joins circle by invite code", async () => {
+    (supabase.rpc as jest.Mock).mockResolvedValue({
+      data: [{ id: "circle-2", name: "친구들", role: "member" }],
+      error: null,
+    });
+
+    const joined = await joinCircleByInviteCode(" abcd-1234 ");
+
+    expect(supabase.rpc).toHaveBeenCalledWith("join_circle_by_invite_code", {
+      p_code: "abcd-1234",
+    });
+    expect(joined).toEqual({ id: "circle-2", name: "친구들", role: "member" });
+  });
+
+  it("rejects blank invite code", async () => {
+    await expect(joinCircleByInviteCode("   ")).rejects.toEqual(
+      expect.objectContaining({ message: "참여 코드를 입력해 주세요." }),
     );
   });
 });

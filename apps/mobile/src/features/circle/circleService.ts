@@ -34,6 +34,20 @@ export type PieceSummary = {
   label: string;
 };
 
+function mapRpcCircleSummaryRow(row: unknown): CircleSummary {
+  if (!row || typeof row !== "object" || !("id" in row) || !("name" in row)) {
+    throw new Error("모임 정보를 확인할 수 없어요.");
+  }
+
+  const role = (row as { role?: unknown }).role === "member" ? "member" : "admin";
+
+  return {
+    id: String((row as { id: unknown }).id),
+    name: String((row as { name: unknown }).name),
+    role,
+  };
+}
+
 export function mapCircleRows(rows: RawCircleRow[]): CircleSummary[] {
   return rows
     .map((row) => {
@@ -67,17 +81,57 @@ export async function createCircleWithMembership(
   }
 
   const row = Array.isArray(data) ? data[0] : data;
-  if (!row || typeof row !== "object" || !("id" in row) || !("name" in row)) {
-    throw new Error("모임 생성 결과를 확인할 수 없어요.");
+  return mapRpcCircleSummaryRow(row);
+}
+
+export async function createCircleInviteCode(circleId: string): Promise<string> {
+  if (!circleId.trim()) {
+    throw new Error("모임 정보를 찾을 수 없어요.");
   }
 
-  const role = (row as { role?: unknown }).role === "member" ? "member" : "admin";
+  const { data, error } = await supabase.rpc("create_circle_invite_code", {
+    p_circle_id: circleId,
+  });
 
-  return {
-    id: String((row as { id: unknown }).id),
-    name: String((row as { name: unknown }).name),
-    role,
-  };
+  if (error) {
+    if (error.message === "not_circle_admin") {
+      throw new Error("관리자만 초대 코드를 만들 수 있어요.");
+    }
+    throw error;
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== "object" || !("code" in row)) {
+    throw new Error("초대 코드를 생성하지 못했어요.");
+  }
+
+  const code = String((row as { code: unknown }).code).trim();
+  if (!code) {
+    throw new Error("초대 코드를 생성하지 못했어요.");
+  }
+
+  return code;
+}
+
+export async function joinCircleByInviteCode(rawCode: string): Promise<CircleSummary> {
+  const normalizedInput = rawCode.trim();
+  if (!normalizedInput) {
+    throw new Error("참여 코드를 입력해 주세요.");
+  }
+
+  const { data, error } = await supabase.rpc("join_circle_by_invite_code", {
+    p_code: normalizedInput,
+  });
+
+  if (error) {
+    if (error.message === "invite_not_found" || error.message === "invalid_invite_code") {
+      throw new Error("유효한 초대 코드가 아니에요.");
+    }
+    throw error;
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  return mapRpcCircleSummaryRow(row);
 }
 
 export async function fetchMyCircles(userId: string): Promise<CircleSummary[]> {

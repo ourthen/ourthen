@@ -21,6 +21,8 @@ type CircleHomeService = {
   fetchMeetupsByCircle: typeof circleService.fetchMeetupsByCircle;
   fetchPiecesByCircle: typeof circleService.fetchPiecesByCircle;
   createCircleWithMembership: typeof circleService.createCircleWithMembership;
+  createCircleInviteCode: typeof circleService.createCircleInviteCode;
+  joinCircleByInviteCode: typeof circleService.joinCircleByInviteCode;
   createMeetup: typeof circleService.createMeetup;
   createTextPiece: typeof circleService.createTextPiece;
 };
@@ -36,6 +38,8 @@ const defaultService: CircleHomeService = {
   fetchMeetupsByCircle: circleService.fetchMeetupsByCircle,
   fetchPiecesByCircle: circleService.fetchPiecesByCircle,
   createCircleWithMembership: circleService.createCircleWithMembership,
+  createCircleInviteCode: circleService.createCircleInviteCode,
+  joinCircleByInviteCode: circleService.joinCircleByInviteCode,
   createMeetup: circleService.createMeetup,
   createTextPiece: circleService.createTextPiece,
 };
@@ -68,6 +72,8 @@ export function CircleHomeScreen({
   const [meetups, setMeetups] = useState<circleService.MeetupSummary[]>([]);
   const [pieces, setPieces] = useState<circleService.PieceSummary[]>([]);
   const [circleName, setCircleName] = useState("");
+  const [joinCode, setJoinCode] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [meetupTitle, setMeetupTitle] = useState("");
   const [pieceBody, setPieceBody] = useState("");
   const [activeTab, setActiveTab] = useState<"home" | "feed">("home");
@@ -122,6 +128,10 @@ export function CircleHomeScreen({
     void loadInitialData();
   }, [loadInitialData]);
 
+  useEffect(() => {
+    setInviteCode("");
+  }, [selectedCircleId]);
+
   const handleSelectCircle = async (circleId: string) => {
     setSelectedCircleId(circleId);
     try {
@@ -143,6 +153,40 @@ export function CircleHomeScreen({
       await loadCircleContent(created.id);
     } catch (error) {
       setErrorMessage(messageFromError(error, "모임 만들기에 실패했어요."));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCreateInviteCode = async () => {
+    if (!selectedCircleId) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setErrorMessage("");
+      const code = await service.createCircleInviteCode(selectedCircleId);
+      setInviteCode(code);
+    } catch (error) {
+      setErrorMessage(messageFromError(error, "초대 코드 생성에 실패했어요."));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleJoinByCode = async () => {
+    try {
+      setIsSaving(true);
+      setErrorMessage("");
+      const joinedCircle = await service.joinCircleByInviteCode(joinCode);
+      setJoinCode("");
+      setActiveTab("home");
+      setCircles((prev) => [joinedCircle, ...prev.filter((row) => row.id !== joinedCircle.id)]);
+      setSelectedCircleId(joinedCircle.id);
+      await loadCircleContent(joinedCircle.id);
+    } catch (error) {
+      setErrorMessage(messageFromError(error, "참여 코드로 모임에 들어가지 못했어요."));
     } finally {
       setIsSaving(false);
     }
@@ -286,6 +330,22 @@ export function CircleHomeScreen({
             >
               <Text style={styles.actionButtonText}>{isSaving ? "생성 중..." : "모임 만들기"}</Text>
             </Pressable>
+            <View style={styles.divider} />
+            <Text style={styles.sectionLabel}>초대 코드로 참여</Text>
+            <TextInput
+              autoCapitalize="characters"
+              onChangeText={setJoinCode}
+              placeholder="참여 코드 입력"
+              placeholderTextColor={colors.textSecondary}
+              style={styles.input}
+              value={joinCode}
+            />
+            <Pressable
+              onPress={handleJoinByCode}
+              style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
+            >
+              <Text style={styles.actionButtonText}>{isSaving ? "참여 중..." : "코드로 참여"}</Text>
+            </Pressable>
           </View>
         ) : null}
 
@@ -317,6 +377,36 @@ export function CircleHomeScreen({
                   </Pressable>
                 ))}
               </View>
+            </View>
+
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionLabel}>초대/참여</Text>
+              <Text style={styles.mutedText}>
+                초대 코드를 만들어 전달하거나, 받은 코드를 입력해 다른 모임에 참여할 수 있어요.
+              </Text>
+              {inviteCode ? <Text style={styles.inviteCodeText}>{inviteCode}</Text> : null}
+              <Pressable
+                onPress={handleCreateInviteCode}
+                style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
+              >
+                <Text style={styles.actionButtonText}>
+                  {isSaving ? "생성 중..." : "이 모임 초대 코드 만들기"}
+                </Text>
+              </Pressable>
+              <TextInput
+                autoCapitalize="characters"
+                onChangeText={setJoinCode}
+                placeholder="참여 코드 입력"
+                placeholderTextColor={colors.textSecondary}
+                style={styles.input}
+                value={joinCode}
+              />
+              <Pressable
+                onPress={handleJoinByCode}
+                style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
+              >
+                <Text style={styles.actionButtonText}>{isSaving ? "참여 중..." : "코드로 참여"}</Text>
+              </Pressable>
             </View>
 
             <View style={[styles.sectionGrid, isSplitLayout && styles.sectionGridDesktop]}>
@@ -503,6 +593,10 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 20,
   },
+  divider: {
+    backgroundColor: colors.border,
+    height: 1,
+  },
   input: {
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.border,
@@ -529,6 +623,13 @@ const styles = StyleSheet.create({
   actionButtonText: {
     color: "#fff",
     fontWeight: "700",
+  },
+  inviteCodeText: {
+    color: colors.textPrimary,
+    fontSize: 24,
+    fontWeight: "800",
+    letterSpacing: 1.8,
+    textAlign: "center",
   },
   circleTitle: {
     color: colors.textPrimary,

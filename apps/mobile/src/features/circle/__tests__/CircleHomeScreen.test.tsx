@@ -6,6 +6,8 @@ const createServiceMock = () => ({
   fetchMeetupsByCircle: jest.fn(),
   fetchPiecesByCircle: jest.fn(),
   createCircleWithMembership: jest.fn(),
+  createCircleInviteCode: jest.fn(),
+  joinCircleByInviteCode: jest.fn(),
   createMeetup: jest.fn(),
   createTextPiece: jest.fn(),
 });
@@ -55,6 +57,34 @@ describe("CircleHomeScreen", () => {
 
     await waitFor(() => {
       expect(onSignOut).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("joins a circle using invite code from empty state", async () => {
+    const service = createServiceMock();
+    service.fetchMyCircles.mockResolvedValue([]);
+    service.joinCircleByInviteCode.mockResolvedValue({
+      id: "c2",
+      name: "우리 동네 팀",
+      role: "member",
+    });
+    service.fetchMeetupsByCircle.mockResolvedValue([]);
+    service.fetchPiecesByCircle.mockResolvedValue([]);
+
+    render(<CircleHomeScreen userId="user-1" service={service} />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("참여 코드 입력")).toBeTruthy();
+    });
+
+    fireEvent.changeText(screen.getByPlaceholderText("참여 코드 입력"), "abcd-1234");
+    fireEvent.press(screen.getByText("코드로 참여"));
+
+    await waitFor(() => {
+      expect(service.joinCircleByInviteCode).toHaveBeenCalledWith("abcd-1234");
+      expect(service.fetchMeetupsByCircle).toHaveBeenCalledWith("c2");
+      expect(service.fetchPiecesByCircle).toHaveBeenCalledWith("c2");
+      expect(screen.getAllByText("우리 동네 팀").length).toBeGreaterThan(0);
     });
   });
 });
