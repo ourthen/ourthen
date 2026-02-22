@@ -86,6 +86,7 @@ describe("CircleHomeScreen", () => {
       expect(service.fetchMeetupsByCircle).toHaveBeenCalledWith("c2");
       expect(service.fetchPiecesByCircle).toHaveBeenCalledWith("c2");
       expect(screen.getAllByText("우리 동네 팀").length).toBeGreaterThan(0);
+      expect(screen.getByText("모임에 참여했어요.")).toBeTruthy();
     });
   });
 

@@ -48,6 +48,14 @@ const defaultService: CircleHomeService = {
   createTextPiece: circleService.createTextPiece,
 };
 
+type BusyAction =
+  | "create_circle"
+  | "join_circle"
+  | "create_invite"
+  | "share_invite"
+  | "create_meetup"
+  | "create_piece";
+
 function messageFromError(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -82,16 +90,22 @@ export function CircleHomeScreen({
   const [pieceBody, setPieceBody] = useState("");
   const [activeTab, setActiveTab] = useState<"home" | "feed">("home");
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [busyAction, setBusyAction] = useState<BusyAction | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [feedRefreshToken, setFeedRefreshToken] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const isSplitLayout = layout.breakpoint === "desktop";
   const selectedCircle = useMemo(
     () => circles.find((circle) => circle.id === selectedCircleId) ?? null,
     [circles, selectedCircleId],
+  );
+  const isBusy = busyAction !== null;
+  const isActionBusy = useCallback(
+    (action: BusyAction) => busyAction === action,
+    [busyAction],
   );
 
   const loadCircleContent = useCallback(
@@ -110,6 +124,7 @@ export function CircleHomeScreen({
   const loadInitialData = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage("");
+    setSuccessMessage("");
     try {
       const fetchedCircles = await service.fetchMyCircles(userId);
       setCircles(fetchedCircles);
@@ -174,18 +189,21 @@ export function CircleHomeScreen({
 
   const handleCreateCircle = async () => {
     try {
-      setIsSaving(true);
+      setBusyAction("create_circle");
       setErrorMessage("");
+      setSuccessMessage("");
       const created = await service.createCircleWithMembership(circleName);
       setCircleName("");
       setInviteCode("");
       setCircles((prev) => [created, ...prev]);
       setSelectedCircleId(created.id);
       await loadCircleContent(created.id);
+      setSuccessMessage("모임을 만들었어요.");
     } catch (error) {
+      setSuccessMessage("");
       setErrorMessage(messageFromError(error, "모임 만들기에 실패했어요."));
     } finally {
-      setIsSaving(false);
+      setBusyAction(null);
     }
   };
 
@@ -195,21 +213,25 @@ export function CircleHomeScreen({
     }
 
     try {
-      setIsSaving(true);
+      setBusyAction("create_invite");
       setErrorMessage("");
+      setSuccessMessage("");
       const code = await service.createCircleInviteCode(selectedCircleId);
       setInviteCode(code);
+      setSuccessMessage("초대 코드를 만들었어요.");
     } catch (error) {
+      setSuccessMessage("");
       setErrorMessage(messageFromError(error, "초대 코드 생성에 실패했어요."));
     } finally {
-      setIsSaving(false);
+      setBusyAction(null);
     }
   };
 
   const handleJoinByCode = async () => {
     try {
-      setIsSaving(true);
+      setBusyAction("join_circle");
       setErrorMessage("");
+      setSuccessMessage("");
       const joinedCircle = await service.joinCircleByInviteCode(joinCode);
       setJoinCode("");
       setActiveTab("home");
@@ -217,10 +239,12 @@ export function CircleHomeScreen({
       setCircles((prev) => [joinedCircle, ...prev.filter((row) => row.id !== joinedCircle.id)]);
       setSelectedCircleId(joinedCircle.id);
       await loadCircleContent(joinedCircle.id);
+      setSuccessMessage("모임에 참여했어요.");
     } catch (error) {
+      setSuccessMessage("");
       setErrorMessage(messageFromError(error, "참여 코드로 모임에 들어가지 못했어요."));
     } finally {
-      setIsSaving(false);
+      setBusyAction(null);
     }
   };
 
@@ -230,15 +254,20 @@ export function CircleHomeScreen({
     }
 
     try {
-      setIsSaving(true);
+      setBusyAction("share_invite");
       setErrorMessage("");
-      await Share.share({
+      setSuccessMessage("");
+      const result = await Share.share({
         message: `[우리그때] ${selectedCircle.name} 초대 코드: ${inviteCode}\n앱에서 코드로 참여해 주세요.`,
       });
+      if (result.action === Share.sharedAction) {
+        setSuccessMessage("초대 코드를 공유했어요.");
+      }
     } catch (error) {
+      setSuccessMessage("");
       setErrorMessage(messageFromError(error, "초대 코드 공유에 실패했어요."));
     } finally {
-      setIsSaving(false);
+      setBusyAction(null);
     }
   };
 
@@ -248,15 +277,18 @@ export function CircleHomeScreen({
     }
 
     try {
-      setIsSaving(true);
+      setBusyAction("create_meetup");
       setErrorMessage("");
+      setSuccessMessage("");
       await service.createMeetup(selectedCircleId, userId, meetupTitle);
       setMeetupTitle("");
       await loadCircleContent(selectedCircleId);
+      setSuccessMessage("모임 일정을 추가했어요.");
     } catch (error) {
+      setSuccessMessage("");
       setErrorMessage(messageFromError(error, "모임 생성에 실패했어요."));
     } finally {
-      setIsSaving(false);
+      setBusyAction(null);
     }
   };
 
@@ -266,16 +298,19 @@ export function CircleHomeScreen({
     }
 
     try {
-      setIsSaving(true);
+      setBusyAction("create_piece");
       setErrorMessage("");
+      setSuccessMessage("");
       await service.createTextPiece(selectedCircleId, userId, pieceBody);
       setPieceBody("");
       await loadCircleContent(selectedCircleId);
       setFeedRefreshToken((prev) => prev + 1);
+      setSuccessMessage("기억 조각을 저장했어요.");
     } catch (error) {
+      setSuccessMessage("");
       setErrorMessage(messageFromError(error, "기억 조각 저장에 실패했어요."));
     } finally {
-      setIsSaving(false);
+      setBusyAction(null);
     }
   };
 
@@ -287,6 +322,7 @@ export function CircleHomeScreen({
     try {
       setIsSigningOut(true);
       setErrorMessage("");
+      setSuccessMessage("");
       await onSignOut();
     } catch (error) {
       setErrorMessage(messageFromError(error, "로그아웃에 실패했어요."));
@@ -299,6 +335,7 @@ export function CircleHomeScreen({
     try {
       setIsRefreshing(true);
       setErrorMessage("");
+      setSuccessMessage("");
       await loadInitialData();
       setFeedRefreshToken((prev) => prev + 1);
     } catch (error) {
@@ -336,12 +373,14 @@ export function CircleHomeScreen({
             <View style={styles.heroActionRow}>
               <Pressable
                 accessibilityRole="button"
+                disabled={isRefreshing || isBusy}
                 onPress={() => {
                   void handleRefresh();
                 }}
                 style={({ pressed }) => [
                   styles.refreshButton,
-                  pressed && styles.refreshButtonPressed,
+                  (isRefreshing || isBusy) && styles.refreshButtonDisabled,
+                  pressed && !(isRefreshing || isBusy) && styles.refreshButtonPressed,
                 ]}
               >
                 <Text style={styles.refreshButtonText}>{isRefreshing ? "갱신 중..." : "새로고침"}</Text>
@@ -349,12 +388,14 @@ export function CircleHomeScreen({
               {onSignOut ? (
                 <Pressable
                   accessibilityRole="button"
+                  disabled={isSigningOut || isBusy}
                   onPress={() => {
                     void handleSignOut();
                   }}
                   style={({ pressed }) => [
                     styles.logoutButton,
-                    pressed && styles.logoutButtonPressed,
+                    (isSigningOut || isBusy) && styles.logoutButtonDisabled,
+                    pressed && !(isSigningOut || isBusy) && styles.logoutButtonPressed,
                   ]}
                 >
                   <Text style={styles.logoutButtonText}>
@@ -411,10 +452,19 @@ export function CircleHomeScreen({
               value={circleName}
             />
             <Pressable
+              disabled={isBusy || circleName.trim().length === 0}
               onPress={handleCreateCircle}
-              style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
+              style={({ pressed }) => [
+                styles.actionButton,
+                (isBusy || circleName.trim().length === 0) && styles.actionButtonDisabled,
+                pressed &&
+                  !(isBusy || circleName.trim().length === 0) &&
+                  styles.actionButtonPressed,
+              ]}
             >
-              <Text style={styles.actionButtonText}>{isSaving ? "생성 중..." : "모임 만들기"}</Text>
+              <Text style={styles.actionButtonText}>
+                {isActionBusy("create_circle") ? "생성 중..." : "모임 만들기"}
+              </Text>
             </Pressable>
             <View style={styles.divider} />
             <Text style={styles.sectionLabel}>초대 코드로 참여</Text>
@@ -427,10 +477,17 @@ export function CircleHomeScreen({
               value={joinCode}
             />
             <Pressable
+              disabled={isBusy || joinCode.trim().length === 0}
               onPress={handleJoinByCode}
-              style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
+              style={({ pressed }) => [
+                styles.actionButton,
+                (isBusy || joinCode.trim().length === 0) && styles.actionButtonDisabled,
+                pressed && !(isBusy || joinCode.trim().length === 0) && styles.actionButtonPressed,
+              ]}
             >
-              <Text style={styles.actionButtonText}>{isSaving ? "참여 중..." : "코드로 참여"}</Text>
+              <Text style={styles.actionButtonText}>
+                {isActionBusy("join_circle") ? "참여 중..." : "코드로 참여"}
+              </Text>
             </Pressable>
           </View>
         ) : null}
@@ -486,23 +543,30 @@ export function CircleHomeScreen({
                 <>
                   {inviteCode ? <Text style={styles.inviteCodeText}>{inviteCode}</Text> : null}
                   <Pressable
+                    disabled={isBusy}
                     onPress={handleCreateInviteCode}
-                    style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
+                    style={({ pressed }) => [
+                      styles.actionButton,
+                      isBusy && styles.actionButtonDisabled,
+                      pressed && !isBusy && styles.actionButtonPressed,
+                    ]}
                   >
                     <Text style={styles.actionButtonText}>
-                      {isSaving ? "생성 중..." : "이 모임 초대 코드 만들기"}
+                      {isActionBusy("create_invite") ? "생성 중..." : "이 모임 초대 코드 만들기"}
                     </Text>
                   </Pressable>
                   {inviteCode ? (
                     <Pressable
+                      disabled={isBusy}
                       onPress={handleShareInviteCode}
                       style={({ pressed }) => [
                         styles.secondaryButton,
-                        pressed && styles.secondaryButtonPressed,
+                        isBusy && styles.secondaryButtonDisabled,
+                        pressed && !isBusy && styles.secondaryButtonPressed,
                       ]}
                     >
                       <Text style={styles.secondaryButtonText}>
-                        {isSaving ? "공유 중..." : "초대 코드 공유하기"}
+                        {isActionBusy("share_invite") ? "공유 중..." : "초대 코드 공유하기"}
                       </Text>
                     </Pressable>
                   ) : null}
@@ -519,10 +583,17 @@ export function CircleHomeScreen({
                 value={joinCode}
               />
               <Pressable
+                disabled={isBusy || joinCode.trim().length === 0}
                 onPress={handleJoinByCode}
-                style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
+                style={({ pressed }) => [
+                  styles.actionButton,
+                  (isBusy || joinCode.trim().length === 0) && styles.actionButtonDisabled,
+                  pressed && !(isBusy || joinCode.trim().length === 0) && styles.actionButtonPressed,
+                ]}
               >
-                <Text style={styles.actionButtonText}>{isSaving ? "참여 중..." : "코드로 참여"}</Text>
+                <Text style={styles.actionButtonText}>
+                  {isActionBusy("join_circle") ? "참여 중..." : "코드로 참여"}
+                </Text>
               </Pressable>
             </View>
 
@@ -545,10 +616,19 @@ export function CircleHomeScreen({
                   value={meetupTitle}
                 />
                 <Pressable
+                  disabled={isBusy || meetupTitle.trim().length === 0}
                   onPress={handleCreateMeetup}
-                  style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
+                  style={({ pressed }) => [
+                    styles.actionButton,
+                    (isBusy || meetupTitle.trim().length === 0) && styles.actionButtonDisabled,
+                    pressed &&
+                      !(isBusy || meetupTitle.trim().length === 0) &&
+                      styles.actionButtonPressed,
+                  ]}
                 >
-                  <Text style={styles.actionButtonText}>{isSaving ? "저장 중..." : "모임 추가"}</Text>
+                  <Text style={styles.actionButtonText}>
+                    {isActionBusy("create_meetup") ? "저장 중..." : "모임 추가"}
+                  </Text>
                 </Pressable>
               </View>
             </View>
@@ -564,10 +644,19 @@ export function CircleHomeScreen({
                 value={pieceBody}
               />
               <Pressable
+                disabled={isBusy || pieceBody.trim().length === 0}
                 onPress={handleCreatePiece}
-                style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
+                style={({ pressed }) => [
+                  styles.actionButton,
+                  (isBusy || pieceBody.trim().length === 0) && styles.actionButtonDisabled,
+                  pressed &&
+                    !(isBusy || pieceBody.trim().length === 0) &&
+                    styles.actionButtonPressed,
+                ]}
               >
-                <Text style={styles.actionButtonText}>{isSaving ? "저장 중..." : "조각 저장"}</Text>
+                <Text style={styles.actionButtonText}>
+                  {isActionBusy("create_piece") ? "저장 중..." : "조각 저장"}
+                </Text>
               </Pressable>
             </View>
 
@@ -591,6 +680,12 @@ export function CircleHomeScreen({
 
         {!isLoading && selectedCircle && activeTab === "feed" ? (
           <FeedScreen circleId={selectedCircle.id} refreshToken={feedRefreshToken} />
+        ) : null}
+
+        {successMessage ? (
+          <View style={styles.successBanner}>
+            <Text style={styles.successText}>{successMessage}</Text>
+          </View>
         ) : null}
 
         {errorMessage ? (
@@ -646,6 +741,9 @@ const styles = StyleSheet.create({
   refreshButtonPressed: {
     opacity: 0.75,
   },
+  refreshButtonDisabled: {
+    opacity: 0.45,
+  },
   refreshButtonText: {
     color: colors.textPrimary,
     fontSize: 12,
@@ -666,6 +764,9 @@ const styles = StyleSheet.create({
   },
   logoutButtonPressed: {
     opacity: 0.75,
+  },
+  logoutButtonDisabled: {
+    opacity: 0.45,
   },
   logoutButtonText: {
     color: colors.textPrimary,
@@ -757,6 +858,9 @@ const styles = StyleSheet.create({
   actionButtonPressed: {
     backgroundColor: colors.primaryPressed,
   },
+  actionButtonDisabled: {
+    backgroundColor: "#90a8d4",
+  },
   actionButtonText: {
     color: "#fff",
     fontWeight: "700",
@@ -772,6 +876,9 @@ const styles = StyleSheet.create({
   },
   secondaryButtonPressed: {
     opacity: 0.75,
+  },
+  secondaryButtonDisabled: {
+    opacity: 0.45,
   },
   secondaryButtonText: {
     color: colors.textPrimary,
@@ -844,6 +951,17 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     borderWidth: 1,
     padding: 12,
+  },
+  successBanner: {
+    backgroundColor: "#e8f7ec",
+    borderColor: "#c4e9d0",
+    borderRadius: radii.md,
+    borderWidth: 1,
+    padding: 12,
+  },
+  successText: {
+    color: "#1f7a3b",
+    fontWeight: "700",
   },
   errorText: {
     color: colors.danger,
