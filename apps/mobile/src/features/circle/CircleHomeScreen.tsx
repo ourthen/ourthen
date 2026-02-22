@@ -24,6 +24,7 @@ type CircleHomeService = {
   fetchPiecesByCircle: typeof circleService.fetchPiecesByCircle;
   createCircleWithMembership: typeof circleService.createCircleWithMembership;
   createCircleInviteCode: typeof circleService.createCircleInviteCode;
+  fetchLatestCircleInviteCode: typeof circleService.fetchLatestCircleInviteCode;
   joinCircleByInviteCode: typeof circleService.joinCircleByInviteCode;
   createMeetup: typeof circleService.createMeetup;
   createTextPiece: typeof circleService.createTextPiece;
@@ -41,6 +42,7 @@ const defaultService: CircleHomeService = {
   fetchPiecesByCircle: circleService.fetchPiecesByCircle,
   createCircleWithMembership: circleService.createCircleWithMembership,
   createCircleInviteCode: circleService.createCircleInviteCode,
+  fetchLatestCircleInviteCode: circleService.fetchLatestCircleInviteCode,
   joinCircleByInviteCode: circleService.joinCircleByInviteCode,
   createMeetup: circleService.createMeetup,
   createTextPiece: circleService.createTextPiece,
@@ -132,10 +134,35 @@ export function CircleHomeScreen({
   }, [loadInitialData]);
 
   useEffect(() => {
-    setInviteCode("");
-  }, [selectedCircleId]);
+    if (!selectedCircle || selectedCircle.role !== "admin") {
+      setInviteCode("");
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadLatestInviteCode = async () => {
+      try {
+        const latestCode = await service.fetchLatestCircleInviteCode(selectedCircle.id);
+        if (isMounted && latestCode) {
+          setInviteCode(latestCode);
+        }
+      } catch {
+        if (isMounted) {
+          setInviteCode("");
+        }
+      }
+    };
+
+    void loadLatestInviteCode();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedCircle, service]);
 
   const handleSelectCircle = async (circleId: string) => {
+    setInviteCode("");
     setSelectedCircleId(circleId);
     try {
       setErrorMessage("");
@@ -151,6 +178,7 @@ export function CircleHomeScreen({
       setErrorMessage("");
       const created = await service.createCircleWithMembership(circleName);
       setCircleName("");
+      setInviteCode("");
       setCircles((prev) => [created, ...prev]);
       setSelectedCircleId(created.id);
       await loadCircleContent(created.id);
@@ -185,6 +213,7 @@ export function CircleHomeScreen({
       const joinedCircle = await service.joinCircleByInviteCode(joinCode);
       setJoinCode("");
       setActiveTab("home");
+      setInviteCode("");
       setCircles((prev) => [joinedCircle, ...prev.filter((row) => row.id !== joinedCircle.id)]);
       setSelectedCircleId(joinedCircle.id);
       await loadCircleContent(joinedCircle.id);

@@ -113,6 +113,31 @@ export async function createCircleInviteCode(circleId: string): Promise<string> 
   return code;
 }
 
+export async function fetchLatestCircleInviteCode(circleId: string): Promise<string | null> {
+  if (!circleId.trim()) {
+    throw new Error("모임 정보를 찾을 수 없어요.");
+  }
+
+  const { data, error } = await supabase.rpc("get_latest_circle_invite_code", {
+    p_circle_id: circleId,
+  });
+
+  if (error) {
+    if (error.message === "not_circle_admin") {
+      return null;
+    }
+    throw error;
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== "object" || !("code" in row)) {
+    return null;
+  }
+
+  const code = String((row as { code: unknown }).code).trim();
+  return code || null;
+}
+
 export async function joinCircleByInviteCode(rawCode: string): Promise<CircleSummary> {
   const normalizedInput = rawCode.trim();
   if (!normalizedInput) {

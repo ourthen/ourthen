@@ -1,6 +1,7 @@
 import {
   createCircleInviteCode,
   createCircleWithMembership,
+  fetchLatestCircleInviteCode,
   joinCircleByInviteCode,
   mapCircleRows,
 } from "../circleService";
@@ -90,5 +91,19 @@ describe("circleService", () => {
     await expect(joinCircleByInviteCode("   ")).rejects.toEqual(
       expect.objectContaining({ message: "참여 코드를 입력해 주세요." }),
     );
+  });
+
+  it("reads latest invite code for admin", async () => {
+    (supabase.rpc as jest.Mock).mockResolvedValue({
+      data: [{ code: "EFGH5678", created_at: "2026-02-23T04:20:00.000Z" }],
+      error: null,
+    });
+
+    const code = await fetchLatestCircleInviteCode("circle-1");
+
+    expect(supabase.rpc).toHaveBeenCalledWith("get_latest_circle_invite_code", {
+      p_circle_id: "circle-1",
+    });
+    expect(code).toBe("EFGH5678");
   });
 });

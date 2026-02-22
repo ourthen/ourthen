@@ -7,6 +7,7 @@ const createServiceMock = () => ({
   fetchPiecesByCircle: jest.fn(),
   createCircleWithMembership: jest.fn(),
   createCircleInviteCode: jest.fn(),
+  fetchLatestCircleInviteCode: jest.fn().mockResolvedValue(null),
   joinCircleByInviteCode: jest.fn(),
   createMeetup: jest.fn(),
   createTextPiece: jest.fn(),
@@ -102,6 +103,21 @@ describe("CircleHomeScreen", () => {
     });
 
     expect(screen.queryByText("이 모임 초대 코드 만들기")).toBeNull();
+  });
+
+  it("loads latest invite code for admin circles", async () => {
+    const service = createServiceMock();
+    service.fetchMyCircles.mockResolvedValue([{ id: "c1", name: "우리 모임", role: "admin" }]);
+    service.fetchMeetupsByCircle.mockResolvedValue([]);
+    service.fetchPiecesByCircle.mockResolvedValue([]);
+    service.fetchLatestCircleInviteCode.mockResolvedValue("ZXCV1234");
+
+    render(<CircleHomeScreen userId="user-1" service={service} />);
+
+    await waitFor(() => {
+      expect(service.fetchLatestCircleInviteCode).toHaveBeenCalledWith("c1");
+      expect(screen.getByText("ZXCV1234")).toBeTruthy();
+    });
   });
 
   it("refreshes circle data when refresh button is pressed", async () => {
