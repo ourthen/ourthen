@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f4efe4;
+  --foreground: #1d1a16;
+  --card: #fff9ec;
+  --accent: #db5f33;
+  --accent-strong: #c14a20;
+  --accent-soft: #ffd4b6;
+  --ink-soft: #675f55;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-display);
+  --color-card: var(--card);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-ink-soft: var(--ink-soft);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body), sans-serif;
+}
+
+.grainy-bg {
+  background:
+    radial-gradient(circle at 8% 15%, #ffe3ca 0 21%, transparent 43%),
+    radial-gradient(circle at 92% 4%, #ffc89d 0 14%, transparent 42%),
+    radial-gradient(circle at 12% 89%, #ffb88b 0 17%, transparent 45%),
+    linear-gradient(135deg, #f4efe4 0%, #f8f2dd 48%, #efe5d2 100%);
+}
+
+.floating-badge {
+  animation: float-y 3.8s ease-in-out infinite;
+}
+
+.card-rise {
+  animation: rise-in 560ms cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+.card-rise:nth-child(2) {
+  animation-delay: 80ms;
+}
+
+.card-rise:nth-child(3) {
+  animation-delay: 160ms;
+}
+
+@keyframes float-y {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floating-badge,
+  .card-rise {
+    animation: none;
+  }
+}

@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# dependencies
+node_modules/
+**/node_modules/
+
+# Next.js / build artifacts
+.next/
+**/.next/
+dist/
+**/dist/
+coverage/
+*.tsbuildinfo
+
+# env files
+.env
+.env.*
+!.env.example
