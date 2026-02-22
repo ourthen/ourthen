@@ -117,6 +117,7 @@ export function CircleHomeScreen({
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [showFirstPieceNudge, setShowFirstPieceNudge] = useState(false);
+  const [isInviteRotateConfirming, setIsInviteRotateConfirming] = useState(false);
   const pieceInputRef = useRef<TextInput | null>(null);
 
   const isSplitLayout = layout.breakpoint === "desktop";
@@ -238,6 +239,7 @@ export function CircleHomeScreen({
 
   const handleSelectCircle = async (circleId: string) => {
     setInviteCode("");
+    setIsInviteRotateConfirming(false);
     setShowFirstPieceNudge(false);
     setSelectedCircleId(circleId);
     try {
@@ -254,6 +256,7 @@ export function CircleHomeScreen({
       setErrorMessage("");
       setSuccessMessage("");
       setShowFirstPieceNudge(false);
+      setIsInviteRotateConfirming(false);
       const created = await service.createCircleWithMembership(circleName);
       setCircleName("");
       setInviteCode("");
@@ -274,6 +277,13 @@ export function CircleHomeScreen({
       return;
     }
 
+    if (inviteCode && !isInviteRotateConfirming) {
+      setErrorMessage("");
+      setSuccessMessage("새 코드를 발급하면 이전 코드가 만료돼요. 계속할까요?");
+      setIsInviteRotateConfirming(true);
+      return;
+    }
+
     try {
       setBusyAction("create_invite");
       setErrorMessage("");
@@ -286,6 +296,7 @@ export function CircleHomeScreen({
           ? "새 코드를 발급했어요. 이전 코드는 만료됐어요."
           : "초대 코드를 발급했어요.",
       );
+      setIsInviteRotateConfirming(false);
     } catch (error) {
       setSuccessMessage("");
       setErrorMessage(messageFromError(error, "초대 코드 생성에 실패했어요."));
@@ -304,6 +315,7 @@ export function CircleHomeScreen({
       setJoinCode("");
       setActiveTab("home");
       setInviteCode("");
+      setIsInviteRotateConfirming(false);
       setCircles((prev) => [joinedCircle, ...prev.filter((row) => row.id !== joinedCircle.id)]);
       setSelectedCircleId(joinedCircle.id);
       const circleContent = await loadCircleContent(joinedCircle.id);
@@ -413,6 +425,7 @@ export function CircleHomeScreen({
       setErrorMessage("");
       setSuccessMessage("");
       setShowFirstPieceNudge(false);
+      setIsInviteRotateConfirming(false);
       await loadInitialData();
       setFeedRefreshToken((prev) => prev + 1);
     } catch (error) {
@@ -735,6 +748,40 @@ export function CircleHomeScreen({
                           : "초대 코드 발급하기"}
                     </Text>
                   </Pressable>
+                  {isInviteRotateConfirming ? (
+                    <View style={styles.confirmCard}>
+                      <Text style={styles.confirmText}>
+                        기존 코드를 공유한 사람이 있다면 새 코드로 다시 안내해 주세요.
+                      </Text>
+                      <View style={styles.confirmActionRow}>
+                        <Pressable
+                          disabled={isBusy}
+                          onPress={() => {
+                            setIsInviteRotateConfirming(false);
+                            setSuccessMessage("");
+                          }}
+                          style={({ pressed }) => [
+                            styles.confirmCancelButton,
+                            isBusy && styles.secondaryButtonDisabled,
+                            pressed && !isBusy && styles.secondaryButtonPressed,
+                          ]}
+                        >
+                          <Text style={styles.confirmCancelButtonText}>취소</Text>
+                        </Pressable>
+                        <Pressable
+                          disabled={isBusy}
+                          onPress={handleCreateInviteCode}
+                          style={({ pressed }) => [
+                            styles.confirmPrimaryButton,
+                            isBusy && styles.actionButtonDisabled,
+                            pressed && !isBusy && styles.actionButtonPressed,
+                          ]}
+                        >
+                          <Text style={styles.confirmPrimaryButtonText}>새 코드 발급 진행</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : null}
                   {inviteCode ? (
                     <Pressable
                       disabled={isBusy}
@@ -1138,6 +1185,48 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: colors.textPrimary,
+    fontWeight: "700",
+  },
+  confirmCard: {
+    backgroundColor: "#fff8ea",
+    borderColor: "#f2dcaa",
+    borderRadius: radii.md,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12,
+  },
+  confirmText: {
+    color: colors.textPrimary,
+    lineHeight: 20,
+  },
+  confirmActionRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  confirmCancelButton: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    flex: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  confirmCancelButtonText: {
+    color: colors.textPrimary,
+    fontWeight: "700",
+  },
+  confirmPrimaryButton: {
+    alignItems: "center",
+    backgroundColor: colors.primary,
+    borderRadius: radii.md,
+    flex: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  confirmPrimaryButtonText: {
+    color: "#fff",
     fontWeight: "700",
   },
   inviteCodeText: {

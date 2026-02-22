@@ -177,6 +177,39 @@ describe("CircleHomeScreen", () => {
     });
   });
 
+  it("requires confirmation before rotating an existing invite code", async () => {
+    const service = createServiceMock();
+    service.fetchMyCircles.mockResolvedValue([{ id: "c1", name: "우리 모임", role: "admin" }]);
+    service.fetchMeetupsByCircle.mockResolvedValue([]);
+    service.fetchCircleMembers.mockResolvedValue([
+      { userId: "user-1", role: "admin", joinedAt: "2026-02-23T12:00:00.000Z" },
+    ]);
+    service.fetchPiecesByCircle.mockResolvedValue([]);
+    service.fetchLatestCircleInviteCode.mockResolvedValue("ZXCV1234");
+    service.createCircleInviteCode.mockResolvedValue("QWER5678");
+
+    render(<CircleHomeScreen userId="user-1" service={service} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("새 코드 다시 발급")).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText("새 코드 다시 발급"));
+
+    await waitFor(() => {
+      expect(screen.getByText("새 코드를 발급하면 이전 코드가 만료돼요. 계속할까요?")).toBeTruthy();
+      expect(screen.getByText("새 코드 발급 진행")).toBeTruthy();
+      expect(service.createCircleInviteCode).toHaveBeenCalledTimes(0);
+    });
+
+    fireEvent.press(screen.getByText("새 코드 발급 진행"));
+
+    await waitFor(() => {
+      expect(service.createCircleInviteCode).toHaveBeenCalledWith("c1");
+      expect(screen.getByText("QWER-5678")).toBeTruthy();
+    });
+  });
+
   it("refreshes circle data when refresh button is pressed", async () => {
     const service = createServiceMock();
     service.fetchMyCircles
