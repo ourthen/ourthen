@@ -15,7 +15,6 @@ import { useResponsiveLayout } from "../../core/ui/layout";
 import { colors, radii } from "../../core/ui/tokens";
 import { FeedScreen } from "../feed/FeedScreen";
 import { MeetupDetailScreen } from "../meetup/MeetupDetailScreen";
-import { PuzzleCard } from "../puzzle/PuzzleCard";
 import * as circleService from "./circleService";
 
 type CircleHomeService = {
@@ -58,7 +57,15 @@ type BusyAction =
   | "create_meetup"
   | "create_piece";
 
-type HomeFocusPanel = "pieces" | "invite" | "meetup" | "members";
+type HomeView = "members" | "pieces" | "meetup" | "invite" | "feed";
+
+const HOME_VIEW_TABS: Array<{ key: HomeView; label: string }> = [
+  { key: "members", label: "모임" },
+  { key: "pieces", label: "기억" },
+  { key: "meetup", label: "일정" },
+  { key: "invite", label: "초대" },
+  { key: "feed", label: "피드" },
+];
 
 function normalizeInviteCode(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
@@ -109,8 +116,7 @@ export function CircleHomeScreen({
   const [inviteCode, setInviteCode] = useState("");
   const [meetupTitle, setMeetupTitle] = useState("");
   const [pieceBody, setPieceBody] = useState("");
-  const [activeTab, setActiveTab] = useState<"home" | "feed">("home");
-  const [homeFocusPanel, setHomeFocusPanel] = useState<HomeFocusPanel>("members");
+  const [activeView, setActiveView] = useState<HomeView>("members");
   const [emptyStateMode, setEmptyStateMode] = useState<"create" | "join">("create");
   const [isLoading, setIsLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<BusyAction | null>(null);
@@ -315,8 +321,7 @@ export function CircleHomeScreen({
       setShowFirstPieceNudge(false);
       const joinedCircle = await service.joinCircleByInviteCode(joinCode);
       setJoinCode("");
-      setActiveTab("home");
-      setHomeFocusPanel("pieces");
+      setActiveView("pieces");
       setInviteCode("");
       setIsInviteRotateConfirming(false);
       setCircles((prev) => [joinedCircle, ...prev.filter((row) => row.id !== joinedCircle.id)]);
@@ -440,8 +445,7 @@ export function CircleHomeScreen({
 
   const handleStartFirstPiece = () => {
     setShowFirstPieceNudge(false);
-    setActiveTab("home");
-    setHomeFocusPanel("pieces");
+    setActiveView("pieces");
     setTimeout(() => {
       pieceInputRef.current?.focus();
     }, 40);
@@ -511,26 +515,22 @@ export function CircleHomeScreen({
             오늘은 지난 순간을 한 조각씩 꺼내고, 모임에서 이어질 이야기를 준비해보세요.
           </Text>
           <View style={styles.tabRow}>
-            <Pressable
-              onPress={() => setActiveTab("home")}
-              style={[styles.tabButton, activeTab === "home" && styles.tabButtonActive]}
-            >
-              <Text
-                style={[styles.tabButtonText, activeTab === "home" && styles.tabButtonTextActive]}
+            {HOME_VIEW_TABS.map((tab) => (
+              <Pressable
+                key={tab.key}
+                onPress={() => setActiveView(tab.key)}
+                style={[styles.tabButton, activeView === tab.key && styles.tabButtonActive]}
               >
-                홈
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setActiveTab("feed")}
-              style={[styles.tabButton, activeTab === "feed" && styles.tabButtonActive]}
-            >
-              <Text
-                style={[styles.tabButtonText, activeTab === "feed" && styles.tabButtonTextActive]}
-              >
-                피드
-              </Text>
-            </Pressable>
+                <Text
+                  style={[
+                    styles.tabButtonText,
+                    activeView === tab.key && styles.tabButtonTextActive,
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </Pressable>
+            ))}
           </View>
         </View>
 
@@ -644,7 +644,7 @@ export function CircleHomeScreen({
           </View>
         ) : null}
 
-        {!isLoading && selectedCircle && activeTab === "home" ? (
+        {!isLoading && selectedCircle ? (
           <>
             <View style={styles.sectionCard}>
               <Text style={styles.sectionLabel}>모임 선택</Text>
@@ -694,83 +694,8 @@ export function CircleHomeScreen({
               </View>
             </View>
 
-            <View style={styles.focusTabRow}>
-              <Pressable
-                onPress={() => setHomeFocusPanel("pieces")}
-                style={[
-                  styles.focusTabButton,
-                  homeFocusPanel === "pieces" && styles.focusTabButtonActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.focusTabButtonText,
-                    homeFocusPanel === "pieces" && styles.focusTabButtonTextActive,
-                  ]}
-                >
-                  기억
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setHomeFocusPanel("invite")}
-                style={[
-                  styles.focusTabButton,
-                  homeFocusPanel === "invite" && styles.focusTabButtonActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.focusTabButtonText,
-                    homeFocusPanel === "invite" && styles.focusTabButtonTextActive,
-                  ]}
-                >
-                  초대
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setHomeFocusPanel("meetup")}
-                style={[
-                  styles.focusTabButton,
-                  homeFocusPanel === "meetup" && styles.focusTabButtonActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.focusTabButtonText,
-                    homeFocusPanel === "meetup" && styles.focusTabButtonTextActive,
-                  ]}
-                >
-                  일정
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setHomeFocusPanel("members")}
-                style={[
-                  styles.focusTabButton,
-                  homeFocusPanel === "members" && styles.focusTabButtonActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.focusTabButtonText,
-                    homeFocusPanel === "members" && styles.focusTabButtonTextActive,
-                  ]}
-                >
-                  모임
-                </Text>
-              </Pressable>
-            </View>
-
-            {homeFocusPanel === "pieces" ? (
+            {activeView === "pieces" ? (
               <>
-                <View style={styles.sectionCard}>
-                  <Text style={styles.sectionLabel}>이번 주 분위기</Text>
-                  <PuzzleCard
-                    score={Math.max(1, Math.min(100, pieces.length * 12 + meetups.length * 8))}
-                    theme={pieces[0]?.label ?? "새로운 기억을 기다리는 중"}
-                  />
-                </View>
-
                 {showFirstPieceNudge ? (
                   <View style={styles.onboardingCard}>
                     <Text style={styles.onboardingTitle}>참여 완료! 첫 조각을 남겨볼까요?</Text>
@@ -821,7 +746,7 @@ export function CircleHomeScreen({
               </>
             ) : null}
 
-            {homeFocusPanel === "invite" ? (
+            {activeView === "invite" ? (
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionLabel}>초대/참여 · {selectedCircle.name}</Text>
                 <Text style={styles.mutedText}>
@@ -934,7 +859,7 @@ export function CircleHomeScreen({
               </View>
             ) : null}
 
-            {homeFocusPanel === "meetup" ? (
+            {activeView === "meetup" ? (
               <>
                 <View style={styles.sectionCard}>
                   <Text style={styles.sectionLabel}>새 모임 일정 추가 · {selectedCircle.name}</Text>
@@ -982,7 +907,7 @@ export function CircleHomeScreen({
               </>
             ) : null}
 
-            {homeFocusPanel === "members" ? (
+            {activeView === "members" ? (
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionLabel}>모임 멤버 · {selectedCircle.name}</Text>
                 {members.length === 0 ? (
@@ -1017,7 +942,7 @@ export function CircleHomeScreen({
           </>
         ) : null}
 
-        {!isLoading && selectedCircle && activeTab === "feed" ? (
+        {!isLoading && selectedCircle && activeView === "feed" ? (
           <FeedScreen circleId={selectedCircle.id} refreshToken={feedRefreshToken} />
         ) : null}
 
@@ -1129,6 +1054,7 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     marginTop: 6,
   },
@@ -1149,32 +1075,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   tabButtonTextActive: {
-    color: "#fff",
-  },
-  focusTabRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  focusTabButton: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderColor: colors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  focusTabButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  focusTabButtonText: {
-    color: colors.textPrimary,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  focusTabButtonTextActive: {
     color: "#fff",
   },
   sectionCard: {
