@@ -25,6 +25,7 @@ type CircleHomeService = {
 };
 
 type CircleHomeScreenProps = {
+  onSignOut?: () => Promise<void> | void;
   userId: string;
   service?: CircleHomeService;
 };
@@ -45,7 +46,11 @@ function messageFromError(error: unknown, fallback: string): string {
   return fallback;
 }
 
-export function CircleHomeScreen({ userId, service = defaultService }: CircleHomeScreenProps) {
+export function CircleHomeScreen({
+  userId,
+  service = defaultService,
+  onSignOut,
+}: CircleHomeScreenProps) {
   const layout = useResponsiveLayout();
   const [circles, setCircles] = useState<circleService.CircleSummary[]>([]);
   const [selectedCircleId, setSelectedCircleId] = useState<string | null>(null);
@@ -57,6 +62,7 @@ export function CircleHomeScreen({ userId, service = defaultService }: CircleHom
   const [activeTab, setActiveTab] = useState<"home" | "feed">("home");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [feedRefreshToken, setFeedRefreshToken] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -168,6 +174,22 @@ export function CircleHomeScreen({ userId, service = defaultService }: CircleHom
     }
   };
 
+  const handleSignOut = async () => {
+    if (!onSignOut) {
+      return;
+    }
+
+    try {
+      setIsSigningOut(true);
+      setErrorMessage("");
+      await onSignOut();
+    } catch (error) {
+      setErrorMessage(messageFromError(error, "로그아웃에 실패했어요."));
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
   return (
     <ScrollView
       contentContainerStyle={[
@@ -179,7 +201,25 @@ export function CircleHomeScreen({ userId, service = defaultService }: CircleHom
     >
       <View style={[styles.content, { maxWidth: layout.contentMaxWidth }]}>
         <View style={styles.heroCard}>
-          <Text style={styles.heroTitle}>우리그때 홈</Text>
+          <View style={styles.heroTopRow}>
+            <Text style={styles.heroTitle}>우리그때 홈</Text>
+            {onSignOut ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  void handleSignOut();
+                }}
+                style={({ pressed }) => [
+                  styles.logoutButton,
+                  pressed && styles.logoutButtonPressed,
+                ]}
+              >
+                <Text style={styles.logoutButtonText}>
+                  {isSigningOut ? "로그아웃 중..." : "로그아웃"}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
           <Text style={styles.heroBody}>
             오늘은 지난 순간을 한 조각씩 꺼내고, 모임에서 이어질 이야기를 준비해보세요.
           </Text>
@@ -365,10 +405,31 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
   },
+  heroTopRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
   heroBody: {
     color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
+  },
+  logoutButton: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  logoutButtonPressed: {
+    opacity: 0.75,
+  },
+  logoutButtonText: {
+    color: colors.textPrimary,
+    fontSize: 12,
+    fontWeight: "700",
   },
   tabRow: {
     flexDirection: "row",

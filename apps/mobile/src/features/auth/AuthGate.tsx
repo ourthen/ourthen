@@ -1,5 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { CircleHomeScreen } from "../circle/CircleHomeScreen";
+import { signOut } from "./authService";
 import { EmailOtpAuthScreen } from "./EmailOtpAuthScreen";
 
 type AuthGateProps = {
@@ -11,5 +12,5 @@ export function AuthGate({ session }: AuthGateProps) {
     return <EmailOtpAuthScreen />;
   }
 
-  return <CircleHomeScreen userId={session.user.id} />;
+  return <CircleHomeScreen userId={session.user.id} onSignOut={signOut} />;
 }

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { CircleHomeScreen } from "../CircleHomeScreen";
 
 const createServiceMock = () => ({
@@ -37,6 +37,24 @@ describe("CircleHomeScreen", () => {
       expect(screen.getAllByText("우리 모임").length).toBeGreaterThan(0);
       expect(screen.getByText("금요일 저녁 모임")).toBeTruthy();
       expect(screen.getAllByText("첫 기억").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("calls onSignOut when logout button is pressed", async () => {
+    const service = createServiceMock();
+    service.fetchMyCircles.mockResolvedValue([]);
+    const onSignOut = jest.fn().mockResolvedValue(undefined);
+
+    render(<CircleHomeScreen userId="user-1" service={service} onSignOut={onSignOut} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("참여한 모임이 아직 없어요.")).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText("로그아웃"));
+
+    await waitFor(() => {
+      expect(onSignOut).toHaveBeenCalledTimes(1);
     });
   });
 });
