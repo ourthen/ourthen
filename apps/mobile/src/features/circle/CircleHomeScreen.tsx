@@ -89,6 +89,7 @@ export function CircleHomeScreen({
   const [meetupTitle, setMeetupTitle] = useState("");
   const [pieceBody, setPieceBody] = useState("");
   const [activeTab, setActiveTab] = useState<"home" | "feed">("home");
+  const [emptyStateMode, setEmptyStateMode] = useState<"create" | "join">("create");
   const [isLoading, setIsLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<BusyAction | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -443,52 +444,100 @@ export function CircleHomeScreen({
           <View style={styles.sectionCard}>
             <Text style={styles.sectionLabel}>시작하기</Text>
             <Text style={styles.emptyStateTitle}>참여한 모임이 아직 없어요.</Text>
-            <Text style={styles.mutedText}>새 모임을 만들면 바로 조각 기록을 시작할 수 있어요.</Text>
-            <TextInput
-              onChangeText={setCircleName}
-              placeholder="모임 이름"
-              placeholderTextColor={colors.textSecondary}
-              style={styles.input}
-              value={circleName}
-            />
-            <Pressable
-              disabled={isBusy || circleName.trim().length === 0}
-              onPress={handleCreateCircle}
-              style={({ pressed }) => [
-                styles.actionButton,
-                (isBusy || circleName.trim().length === 0) && styles.actionButtonDisabled,
-                pressed &&
-                  !(isBusy || circleName.trim().length === 0) &&
-                  styles.actionButtonPressed,
-              ]}
-            >
-              <Text style={styles.actionButtonText}>
-                {isActionBusy("create_circle") ? "생성 중..." : "모임 만들기"}
-              </Text>
-            </Pressable>
-            <View style={styles.divider} />
-            <Text style={styles.sectionLabel}>초대 코드로 참여</Text>
-            <TextInput
-              autoCapitalize="characters"
-              onChangeText={setJoinCode}
-              placeholder="참여 코드 입력"
-              placeholderTextColor={colors.textSecondary}
-              style={styles.input}
-              value={joinCode}
-            />
-            <Pressable
-              disabled={isBusy || joinCode.trim().length === 0}
-              onPress={handleJoinByCode}
-              style={({ pressed }) => [
-                styles.actionButton,
-                (isBusy || joinCode.trim().length === 0) && styles.actionButtonDisabled,
-                pressed && !(isBusy || joinCode.trim().length === 0) && styles.actionButtonPressed,
-              ]}
-            >
-              <Text style={styles.actionButtonText}>
-                {isActionBusy("join_circle") ? "참여 중..." : "코드로 참여"}
-              </Text>
-            </Pressable>
+            <Text style={styles.mutedText}>한 번에 하나씩, 모임을 만들거나 코드로 참여해 보세요.</Text>
+            <View style={styles.emptyModeRow}>
+              <Pressable
+                onPress={() => {
+                  setEmptyStateMode("create");
+                  setErrorMessage("");
+                }}
+                style={[
+                  styles.emptyModeButton,
+                  emptyStateMode === "create" && styles.emptyModeButtonActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.emptyModeButtonText,
+                    emptyStateMode === "create" && styles.emptyModeButtonTextActive,
+                  ]}
+                >
+                  모임 만들기
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  setEmptyStateMode("join");
+                  setErrorMessage("");
+                }}
+                style={[
+                  styles.emptyModeButton,
+                  emptyStateMode === "join" && styles.emptyModeButtonActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.emptyModeButtonText,
+                    emptyStateMode === "join" && styles.emptyModeButtonTextActive,
+                  ]}
+                >
+                  코드 참여
+                </Text>
+              </Pressable>
+            </View>
+
+            {emptyStateMode === "create" ? (
+              <>
+                <TextInput
+                  onChangeText={setCircleName}
+                  placeholder="모임 이름"
+                  placeholderTextColor={colors.textSecondary}
+                  style={styles.input}
+                  value={circleName}
+                />
+                <Pressable
+                  disabled={isBusy || circleName.trim().length === 0}
+                  onPress={handleCreateCircle}
+                  style={({ pressed }) => [
+                    styles.actionButton,
+                    (isBusy || circleName.trim().length === 0) && styles.actionButtonDisabled,
+                    pressed &&
+                      !(isBusy || circleName.trim().length === 0) &&
+                      styles.actionButtonPressed,
+                  ]}
+                >
+                  <Text style={styles.actionButtonText}>
+                    {isActionBusy("create_circle") ? "생성 중..." : "모임 만들기"}
+                  </Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <TextInput
+                  autoCapitalize="characters"
+                  onChangeText={setJoinCode}
+                  placeholder="참여 코드 입력"
+                  placeholderTextColor={colors.textSecondary}
+                  style={styles.input}
+                  value={joinCode}
+                />
+                <Pressable
+                  disabled={isBusy || joinCode.trim().length === 0}
+                  onPress={handleJoinByCode}
+                  style={({ pressed }) => [
+                    styles.actionButton,
+                    (isBusy || joinCode.trim().length === 0) && styles.actionButtonDisabled,
+                    pressed &&
+                      !(isBusy || joinCode.trim().length === 0) &&
+                      styles.actionButtonPressed,
+                  ]}
+                >
+                  <Text style={styles.actionButtonText}>
+                    {isActionBusy("join_circle") ? "참여 중..." : "코드로 참여하기"}
+                  </Text>
+                </Pressable>
+              </>
+            )}
           </View>
         ) : null}
 
@@ -831,9 +880,30 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 20,
   },
-  divider: {
-    backgroundColor: colors.border,
-    height: 1,
+  emptyModeRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  emptyModeButton: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  emptyModeButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  emptyModeButtonText: {
+    color: colors.textPrimary,
+    fontWeight: "700",
+  },
+  emptyModeButtonTextActive: {
+    color: "#fff",
   },
   input: {
     backgroundColor: colors.surfaceMuted,

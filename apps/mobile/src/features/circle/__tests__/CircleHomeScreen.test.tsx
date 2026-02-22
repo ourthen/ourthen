@@ -75,11 +75,12 @@ describe("CircleHomeScreen", () => {
     render(<CircleHomeScreen userId="user-1" service={service} />);
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText("참여 코드 입력")).toBeTruthy();
+      expect(screen.getByPlaceholderText("모임 이름")).toBeTruthy();
     });
 
+    fireEvent.press(screen.getByText("코드 참여"));
     fireEvent.changeText(screen.getByPlaceholderText("참여 코드 입력"), "abcd-1234");
-    fireEvent.press(screen.getByText("코드로 참여"));
+    fireEvent.press(screen.getByText("코드로 참여하기"));
 
     await waitFor(() => {
       expect(service.joinCircleByInviteCode).toHaveBeenCalledWith("abcd-1234");
