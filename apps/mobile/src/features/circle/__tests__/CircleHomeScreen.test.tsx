@@ -103,4 +103,25 @@ describe("CircleHomeScreen", () => {
 
     expect(screen.queryByText("이 모임 초대 코드 만들기")).toBeNull();
   });
+
+  it("refreshes circle data when refresh button is pressed", async () => {
+    const service = createServiceMock();
+    service.fetchMyCircles
+      .mockResolvedValueOnce([{ id: "c1", name: "우리 모임", role: "admin" }])
+      .mockResolvedValueOnce([{ id: "c1", name: "우리 모임", role: "admin" }]);
+    service.fetchMeetupsByCircle.mockResolvedValue([]);
+    service.fetchPiecesByCircle.mockResolvedValue([]);
+
+    render(<CircleHomeScreen userId="user-1" service={service} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("우리 모임").length).toBeGreaterThan(0);
+    });
+
+    fireEvent.press(screen.getByText("새로고침"));
+
+    await waitFor(() => {
+      expect(service.fetchMyCircles).toHaveBeenCalledTimes(2);
+    });
+  });
 });

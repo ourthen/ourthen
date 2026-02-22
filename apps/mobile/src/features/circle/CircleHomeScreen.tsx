@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Keyboard,
   Pressable,
+  RefreshControl,
   ScrollView,
   Share,
   StyleSheet,
@@ -81,6 +82,7 @@ export function CircleHomeScreen({
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [feedRefreshToken, setFeedRefreshToken] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -264,6 +266,19 @@ export function CircleHomeScreen({
     }
   };
 
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      setErrorMessage("");
+      await loadInitialData();
+      setFeedRefreshToken((prev) => prev + 1);
+    } catch (error) {
+      setErrorMessage(messageFromError(error, "모임 정보를 새로고침하지 못했어요."));
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <ScrollView
       contentContainerStyle={[
@@ -275,27 +290,50 @@ export function CircleHomeScreen({
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
       onScrollBeginDrag={Keyboard.dismiss}
+      refreshControl={
+        <RefreshControl
+          onRefresh={() => {
+            void handleRefresh();
+          }}
+          refreshing={isRefreshing}
+          tintColor={colors.primary}
+        />
+      }
     >
       <View style={[styles.content, { maxWidth: layout.contentMaxWidth }]}>
         <View style={styles.heroCard}>
           <View style={styles.heroTopRow}>
             <Text style={styles.heroTitle}>우리그때 홈</Text>
-            {onSignOut ? (
+            <View style={styles.heroActionRow}>
               <Pressable
                 accessibilityRole="button"
                 onPress={() => {
-                  void handleSignOut();
+                  void handleRefresh();
                 }}
                 style={({ pressed }) => [
-                  styles.logoutButton,
-                  pressed && styles.logoutButtonPressed,
+                  styles.refreshButton,
+                  pressed && styles.refreshButtonPressed,
                 ]}
               >
-                <Text style={styles.logoutButtonText}>
-                  {isSigningOut ? "로그아웃 중..." : "로그아웃"}
-                </Text>
+                <Text style={styles.refreshButtonText}>{isRefreshing ? "갱신 중..." : "새로고침"}</Text>
               </Pressable>
-            ) : null}
+              {onSignOut ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    void handleSignOut();
+                  }}
+                  style={({ pressed }) => [
+                    styles.logoutButton,
+                    pressed && styles.logoutButtonPressed,
+                  ]}
+                >
+                  <Text style={styles.logoutButtonText}>
+                    {isSigningOut ? "로그아웃 중..." : "로그아웃"}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
           </View>
           <Text style={styles.heroBody}>
             오늘은 지난 순간을 한 조각씩 꺼내고, 모임에서 이어질 이야기를 준비해보세요.
@@ -563,6 +601,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
+  },
+  heroActionRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  refreshButton: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  refreshButtonPressed: {
+    opacity: 0.75,
+  },
+  refreshButtonText: {
+    color: colors.textPrimary,
+    fontSize: 12,
+    fontWeight: "700",
   },
   heroBody: {
     color: colors.textSecondary,
