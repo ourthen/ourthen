@@ -110,7 +110,7 @@ export function CircleHomeScreen({
   const [meetupTitle, setMeetupTitle] = useState("");
   const [pieceBody, setPieceBody] = useState("");
   const [activeTab, setActiveTab] = useState<"home" | "feed">("home");
-  const [homeFocusPanel, setHomeFocusPanel] = useState<HomeFocusPanel>("pieces");
+  const [homeFocusPanel, setHomeFocusPanel] = useState<HomeFocusPanel>("members");
   const [emptyStateMode, setEmptyStateMode] = useState<"create" | "join">("create");
   const [isLoading, setIsLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<BusyAction | null>(null);
@@ -243,7 +243,6 @@ export function CircleHomeScreen({
     setInviteCode("");
     setIsInviteRotateConfirming(false);
     setShowFirstPieceNudge(false);
-    setHomeFocusPanel("pieces");
     setSelectedCircleId(circleId);
     try {
       setErrorMessage("");
@@ -648,7 +647,7 @@ export function CircleHomeScreen({
         {!isLoading && selectedCircle && activeTab === "home" ? (
           <>
             <View style={styles.sectionCard}>
-              <Text style={styles.sectionLabel}>내 모임</Text>
+              <Text style={styles.sectionLabel}>모임 선택</Text>
               <View style={styles.circleTitleRow}>
                 <Text style={styles.circleTitle}>{selectedCircle.name}</Text>
                 <View
@@ -662,6 +661,9 @@ export function CircleHomeScreen({
                   </Text>
                 </View>
               </View>
+              <Text style={styles.mutedText}>
+                현재 선택된 모임이에요. 기억/일정/초대는 모두 이 모임으로 연결돼요.
+              </Text>
               <View style={styles.circleChipRow}>
                 {circles.map((circle) => (
                   <Pressable
@@ -706,7 +708,7 @@ export function CircleHomeScreen({
                     homeFocusPanel === "pieces" && styles.focusTabButtonTextActive,
                   ]}
                 >
-                  기억 조각
+                  기억
                 </Text>
               </Pressable>
               <Pressable
@@ -722,7 +724,7 @@ export function CircleHomeScreen({
                     homeFocusPanel === "invite" && styles.focusTabButtonTextActive,
                   ]}
                 >
-                  초대/참여
+                  초대
                 </Text>
               </Pressable>
               <Pressable
@@ -738,7 +740,7 @@ export function CircleHomeScreen({
                     homeFocusPanel === "meetup" && styles.focusTabButtonTextActive,
                   ]}
                 >
-                  모임 일정
+                  일정
                 </Text>
               </Pressable>
               <Pressable
@@ -754,7 +756,7 @@ export function CircleHomeScreen({
                     homeFocusPanel === "members" && styles.focusTabButtonTextActive,
                   ]}
                 >
-                  멤버 목록
+                  모임
                 </Text>
               </Pressable>
             </View>
@@ -790,12 +792,12 @@ export function CircleHomeScreen({
                 ) : null}
 
                 <View style={styles.sectionCard}>
-                  <Text style={styles.sectionLabel}>기억 조각 추가</Text>
+                  <Text style={styles.sectionLabel}>기억 조각 추가 · {selectedCircle.name}</Text>
                   <TextInput
                     ref={pieceInputRef}
                     multiline
                     onChangeText={setPieceBody}
-                    placeholder="새 기억 조각"
+                    placeholder={`${selectedCircle.name}에 남길 기억 조각`}
                     placeholderTextColor={colors.textSecondary}
                     style={[styles.input, styles.multilineInput]}
                     value={pieceBody}
@@ -821,9 +823,10 @@ export function CircleHomeScreen({
 
             {homeFocusPanel === "invite" ? (
               <View style={styles.sectionCard}>
-                <Text style={styles.sectionLabel}>초대/참여</Text>
+                <Text style={styles.sectionLabel}>초대/참여 · {selectedCircle.name}</Text>
                 <Text style={styles.mutedText}>
-                  초대 코드를 만들어 전달하거나, 받은 코드를 입력해 다른 모임에 참여할 수 있어요.
+                  초대받아 들어온 모임도 모두 같은 방식으로 목록에 합쳐지고, 선택한 모임 기준으로
+                  기억/일정이 연결돼요.
                 </Text>
                 {selectedCircle.role === "admin" ? (
                   <>
@@ -934,7 +937,7 @@ export function CircleHomeScreen({
             {homeFocusPanel === "meetup" ? (
               <>
                 <View style={styles.sectionCard}>
-                  <Text style={styles.sectionLabel}>새 모임 일정 추가</Text>
+                  <Text style={styles.sectionLabel}>새 모임 일정 추가 · {selectedCircle.name}</Text>
                   <TextInput
                     onChangeText={setMeetupTitle}
                     placeholder="새 모임 제목"
@@ -960,7 +963,7 @@ export function CircleHomeScreen({
                 </View>
 
                 <View style={styles.sectionCard}>
-                  <Text style={styles.sectionLabel}>다가오는 모임</Text>
+                  <Text style={styles.sectionLabel}>다가오는 모임 · {selectedCircle.name}</Text>
                   {meetups.length === 0 ? (
                     <Text style={styles.mutedText}>
                       아직 등록된 모임이 없어요. 위에서 첫 모임을 만들어보세요.
@@ -981,7 +984,7 @@ export function CircleHomeScreen({
 
             {homeFocusPanel === "members" ? (
               <View style={styles.sectionCard}>
-                <Text style={styles.sectionLabel}>모임 멤버</Text>
+                <Text style={styles.sectionLabel}>모임 멤버 · {selectedCircle.name}</Text>
                 {members.length === 0 ? (
                   <Text style={styles.mutedText}>아직 멤버 정보를 불러오지 못했어요.</Text>
                 ) : (

@@ -42,19 +42,19 @@ describe("CircleHomeScreen", () => {
 
     await waitFor(() => {
       expect(screen.getAllByText("우리 모임").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("첫 기억").length).toBeGreaterThan(0);
+      expect(screen.getByText("모임 멤버 · 우리 모임")).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText("모임 일정"));
+    fireEvent.press(screen.getByText("일정"));
 
     await waitFor(() => {
       expect(screen.getByText("금요일 저녁 모임")).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText("멤버 목록"));
+    fireEvent.press(screen.getByText("모임"));
 
     await waitFor(() => {
-      expect(screen.getByText("모임 멤버")).toBeTruthy();
+      expect(screen.getByText("모임 멤버 · 우리 모임")).toBeTruthy();
       expect(screen.getByText("나")).toBeTruthy();
     });
   });
@@ -131,7 +131,7 @@ describe("CircleHomeScreen", () => {
       expect(screen.getAllByText("동네 친구").length).toBeGreaterThan(0);
     });
 
-    fireEvent.press(screen.getByText("초대/참여"));
+    fireEvent.press(screen.getByText("초대"));
 
     await waitFor(() => {
       expect(screen.getByText("현재 계정은 멤버 권한이라 초대 코드를 만들 수 없어요.")).toBeTruthy();
@@ -190,7 +190,7 @@ describe("CircleHomeScreen", () => {
       expect(screen.getAllByText("우리 모임").length).toBeGreaterThan(0);
     });
 
-    fireEvent.press(screen.getByText("초대/참여"));
+    fireEvent.press(screen.getByText("초대"));
 
     await waitFor(() => {
       expect(service.fetchLatestCircleInviteCode).toHaveBeenCalledWith("c1");
@@ -215,7 +215,7 @@ describe("CircleHomeScreen", () => {
       expect(screen.getAllByText("우리 모임").length).toBeGreaterThan(0);
     });
 
-    fireEvent.press(screen.getByText("초대/참여"));
+    fireEvent.press(screen.getByText("초대"));
 
     await waitFor(() => {
       expect(screen.getByText("새 코드 다시 발급")).toBeTruthy();
@@ -271,16 +271,23 @@ describe("CircleHomeScreen", () => {
     render(<CircleHomeScreen userId="user-1" service={service} />);
 
     await waitFor(() => {
-      expect(screen.getByText("기억 조각 추가")).toBeTruthy();
+      expect(screen.getByText("모임 멤버 · 우리 모임")).toBeTruthy();
     });
 
     expect(screen.queryByText("초대 코드 발급하기")).toBeNull();
 
-    fireEvent.press(screen.getByText("초대/참여"));
+    fireEvent.press(screen.getByText("기억"));
+
+    await waitFor(() => {
+      expect(screen.getByText("기억 조각 추가 · 우리 모임")).toBeTruthy();
+      expect(screen.queryByText("초대 코드 발급하기")).toBeNull();
+    });
+
+    fireEvent.press(screen.getByText("초대"));
 
     await waitFor(() => {
       expect(screen.getByText("초대 코드 발급하기")).toBeTruthy();
-      expect(screen.queryByText("기억 조각 추가")).toBeNull();
+      expect(screen.queryByText("기억 조각 추가 · 우리 모임")).toBeNull();
     });
   });
 
