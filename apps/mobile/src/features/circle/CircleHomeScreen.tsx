@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useResponsiveLayout } from "../../core/ui/layout";
 import { colors, radii } from "../../core/ui/tokens";
+import { FeedScreen } from "../feed/FeedScreen";
 import { MeetupDetailScreen } from "../meetup/MeetupDetailScreen";
 import { PuzzleCard } from "../puzzle/PuzzleCard";
 import * as circleService from "./circleService";
@@ -53,8 +54,10 @@ export function CircleHomeScreen({ userId, service = defaultService }: CircleHom
   const [circleName, setCircleName] = useState("");
   const [meetupTitle, setMeetupTitle] = useState("");
   const [pieceBody, setPieceBody] = useState("");
+  const [activeTab, setActiveTab] = useState<"home" | "feed">("home");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [feedRefreshToken, setFeedRefreshToken] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
 
   const isSplitLayout = layout.breakpoint === "desktop";
@@ -157,6 +160,7 @@ export function CircleHomeScreen({ userId, service = defaultService }: CircleHom
       await service.createTextPiece(selectedCircleId, userId, pieceBody);
       setPieceBody("");
       await loadCircleContent(selectedCircleId);
+      setFeedRefreshToken((prev) => prev + 1);
     } catch (error) {
       setErrorMessage(messageFromError(error, "기억 조각 저장에 실패했어요."));
     } finally {
@@ -179,6 +183,28 @@ export function CircleHomeScreen({ userId, service = defaultService }: CircleHom
           <Text style={styles.heroBody}>
             오늘은 지난 순간을 한 조각씩 꺼내고, 모임에서 이어질 이야기를 준비해보세요.
           </Text>
+          <View style={styles.tabRow}>
+            <Pressable
+              onPress={() => setActiveTab("home")}
+              style={[styles.tabButton, activeTab === "home" && styles.tabButtonActive]}
+            >
+              <Text
+                style={[styles.tabButtonText, activeTab === "home" && styles.tabButtonTextActive]}
+              >
+                홈
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setActiveTab("feed")}
+              style={[styles.tabButton, activeTab === "feed" && styles.tabButtonActive]}
+            >
+              <Text
+                style={[styles.tabButtonText, activeTab === "feed" && styles.tabButtonTextActive]}
+              >
+                피드
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
         {isLoading ? (
@@ -209,7 +235,7 @@ export function CircleHomeScreen({ userId, service = defaultService }: CircleHom
           </View>
         ) : null}
 
-        {!isLoading && selectedCircle ? (
+        {!isLoading && selectedCircle && activeTab === "home" ? (
           <>
             <View style={styles.sectionCard}>
               <Text style={styles.sectionLabel}>내 모임</Text>
@@ -302,6 +328,10 @@ export function CircleHomeScreen({ userId, service = defaultService }: CircleHom
           </>
         ) : null}
 
+        {!isLoading && selectedCircle && activeTab === "feed" ? (
+          <FeedScreen circleId={selectedCircle.id} refreshToken={feedRefreshToken} />
+        ) : null}
+
         {errorMessage ? (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{errorMessage}</Text>
@@ -339,6 +369,30 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
+  },
+  tabRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 6,
+  },
+  tabButton: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  tabButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  tabButtonText: {
+    color: colors.textPrimary,
+    fontWeight: "600",
+  },
+  tabButtonTextActive: {
+    color: "#fff",
   },
   sectionGrid: {
     gap: 14,
