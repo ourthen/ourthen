@@ -122,6 +122,23 @@ export function CircleHomeScreen({
     () => circles.find((circle) => circle.id === selectedCircleId) ?? null,
     [circles, selectedCircleId],
   );
+  const orderedMembers = useMemo(() => {
+    return [...members].sort((a, b) => {
+      if (a.userId === userId && b.userId !== userId) {
+        return -1;
+      }
+      if (b.userId === userId && a.userId !== userId) {
+        return 1;
+      }
+      if (a.role === "admin" && b.role !== "admin") {
+        return -1;
+      }
+      if (b.role === "admin" && a.role !== "admin") {
+        return 1;
+      }
+      return (a.joinedAt ?? "").localeCompare(b.joinedAt ?? "");
+    });
+  }, [members, userId]);
   const isBusy = busyAction !== null;
   const isActionBusy = useCallback(
     (action: BusyAction) => busyAction === action,
@@ -637,7 +654,7 @@ export function CircleHomeScreen({
                 <Text style={styles.mutedText}>아직 멤버 정보를 불러오지 못했어요.</Text>
               ) : (
                 <View style={styles.memberList}>
-                  {members.map((member) => (
+                  {orderedMembers.map((member) => (
                     <View key={member.userId} style={styles.memberRow}>
                       <Text style={styles.memberNameText}>
                         {member.userId === userId
