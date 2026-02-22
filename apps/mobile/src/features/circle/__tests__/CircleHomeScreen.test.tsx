@@ -101,6 +101,8 @@ describe("CircleHomeScreen", () => {
       expect(service.fetchPiecesByCircle).toHaveBeenCalledWith("c2");
       expect(screen.getAllByText("우리 동네 팀").length).toBeGreaterThan(0);
       expect(screen.getByText("모임에 참여했어요.")).toBeTruthy();
+      expect(screen.getByText("참여 완료! 첫 조각을 남겨볼까요?")).toBeTruthy();
+      expect(screen.getByText("첫 조각 작성하기")).toBeTruthy();
     });
   });
 
@@ -122,6 +124,39 @@ describe("CircleHomeScreen", () => {
 
     expect(screen.queryByText("초대 코드 발급하기")).toBeNull();
     expect(screen.queryByText("새 코드 다시 발급")).toBeNull();
+  });
+
+  it("does not show first-piece nudge when joined circle already has pieces", async () => {
+    const service = createServiceMock();
+    service.fetchMyCircles.mockResolvedValue([]);
+    service.joinCircleByInviteCode.mockResolvedValue({
+      id: "c2",
+      name: "우리 동네 팀",
+      role: "member",
+    });
+    service.fetchMeetupsByCircle.mockResolvedValue([]);
+    service.fetchCircleMembers.mockResolvedValue([
+      { userId: "user-1", role: "member", joinedAt: "2026-02-23T12:00:00.000Z" },
+    ]);
+    service.fetchPiecesByCircle.mockResolvedValue([{ id: "p1", label: "이미 있던 조각" }]);
+
+    render(<CircleHomeScreen userId="user-1" service={service} />);
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("모임 이름")).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText("코드 참여"));
+    fireEvent.changeText(
+      screen.getByPlaceholderText("참여 코드 입력 (예: ABCD-1234)"),
+      "abcd-1234",
+    );
+    fireEvent.press(screen.getByText("코드로 참여하기"));
+
+    await waitFor(() => {
+      expect(service.joinCircleByInviteCode).toHaveBeenCalledWith("ABCD1234");
+      expect(screen.queryByText("참여 완료! 첫 조각을 남겨볼까요?")).toBeNull();
+    });
   });
 
   it("loads latest invite code for admin circles", async () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -116,6 +116,8 @@ export function CircleHomeScreen({
   const [feedRefreshToken, setFeedRefreshToken] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [showFirstPieceNudge, setShowFirstPieceNudge] = useState(false);
+  const pieceInputRef = useRef<TextInput | null>(null);
 
   const isSplitLayout = layout.breakpoint === "desktop";
   const selectedCircle = useMemo(
@@ -156,6 +158,11 @@ export function CircleHomeScreen({
       setMeetups(nextMeetups);
       setMembers(nextMembers);
       setPieces(nextPieces);
+      return {
+        meetups: nextMeetups,
+        members: nextMembers,
+        pieces: nextPieces,
+      };
     },
     [service],
   );
@@ -204,7 +211,6 @@ export function CircleHomeScreen({
 
   useEffect(() => {
     if (!selectedCircle || selectedCircle.role !== "admin") {
-      setInviteCode("");
       return;
     }
 
@@ -232,6 +238,7 @@ export function CircleHomeScreen({
 
   const handleSelectCircle = async (circleId: string) => {
     setInviteCode("");
+    setShowFirstPieceNudge(false);
     setSelectedCircleId(circleId);
     try {
       setErrorMessage("");
@@ -246,6 +253,7 @@ export function CircleHomeScreen({
       setBusyAction("create_circle");
       setErrorMessage("");
       setSuccessMessage("");
+      setShowFirstPieceNudge(false);
       const created = await service.createCircleWithMembership(circleName);
       setCircleName("");
       setInviteCode("");
@@ -291,13 +299,21 @@ export function CircleHomeScreen({
       setBusyAction("join_circle");
       setErrorMessage("");
       setSuccessMessage("");
+      setShowFirstPieceNudge(false);
       const joinedCircle = await service.joinCircleByInviteCode(joinCode);
       setJoinCode("");
       setActiveTab("home");
       setInviteCode("");
       setCircles((prev) => [joinedCircle, ...prev.filter((row) => row.id !== joinedCircle.id)]);
       setSelectedCircleId(joinedCircle.id);
-      await loadCircleContent(joinedCircle.id);
+      const circleContent = await loadCircleContent(joinedCircle.id);
+      const shouldNudgeFirstPiece = circleContent.pieces.length === 0;
+      setShowFirstPieceNudge(shouldNudgeFirstPiece);
+      if (shouldNudgeFirstPiece) {
+        setTimeout(() => {
+          pieceInputRef.current?.focus();
+        }, 80);
+      }
       setSuccessMessage("모임에 참여했어요.");
     } catch (error) {
       setSuccessMessage("");
@@ -364,6 +380,7 @@ export function CircleHomeScreen({
       setPieceBody("");
       await loadCircleContent(selectedCircleId);
       setFeedRefreshToken((prev) => prev + 1);
+      setShowFirstPieceNudge(false);
       setSuccessMessage("기억 조각을 저장했어요.");
     } catch (error) {
       setSuccessMessage("");
@@ -395,6 +412,7 @@ export function CircleHomeScreen({
       setIsRefreshing(true);
       setErrorMessage("");
       setSuccessMessage("");
+      setShowFirstPieceNudge(false);
       await loadInitialData();
       setFeedRefreshToken((prev) => prev + 1);
     } catch (error) {
@@ -402,6 +420,14 @@ export function CircleHomeScreen({
     } finally {
       setIsRefreshing(false);
     }
+  };
+
+  const handleStartFirstPiece = () => {
+    setShowFirstPieceNudge(false);
+    setActiveTab("home");
+    setTimeout(() => {
+      pieceInputRef.current?.focus();
+    }, 40);
   };
 
   return (
@@ -789,9 +815,30 @@ export function CircleHomeScreen({
               </View>
             </View>
 
+            {showFirstPieceNudge ? (
+              <View style={styles.onboardingCard}>
+                <Text style={styles.onboardingTitle}>참여 완료! 첫 조각을 남겨볼까요?</Text>
+                <Text style={styles.onboardingBody}>
+                  지금 한 줄만 적어도 모임 피드에 바로 공유돼요.
+                </Text>
+                <Pressable
+                  disabled={isBusy}
+                  onPress={handleStartFirstPiece}
+                  style={({ pressed }) => [
+                    styles.actionButton,
+                    isBusy && styles.actionButtonDisabled,
+                    pressed && !isBusy && styles.actionButtonPressed,
+                  ]}
+                >
+                  <Text style={styles.actionButtonText}>첫 조각 작성하기</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
             <View style={styles.sectionCard}>
               <Text style={styles.sectionLabel}>기억 조각 추가</Text>
               <TextInput
+                ref={pieceInputRef}
                 multiline
                 onChangeText={setPieceBody}
                 placeholder="새 기억 조각"
@@ -982,6 +1029,23 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 12,
     padding: 16,
+  },
+  onboardingCard: {
+    backgroundColor: "#eef5ff",
+    borderColor: "#c9dcfb",
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    gap: 10,
+    padding: 16,
+  },
+  onboardingTitle: {
+    color: colors.textPrimary,
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  onboardingBody: {
+    color: colors.textSecondary,
+    lineHeight: 20,
   },
   sectionLabel: {
     color: colors.textSecondary,
