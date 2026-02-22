@@ -4,6 +4,7 @@ import { supabase } from "../../../lib/supabase";
 jest.mock("../../../lib/supabase", () => ({
   supabase: {
     from: jest.fn(),
+    rpc: jest.fn(),
   },
 }));
 
@@ -32,41 +33,22 @@ describe("circleService", () => {
     ]);
   });
 
-  it("creates circle and self membership", async () => {
-    const single = jest.fn().mockResolvedValue({
-      data: { id: "circle-1", name: "새 모임" },
+  it("creates circle via rpc", async () => {
+    (supabase.rpc as jest.Mock).mockResolvedValue({
+      data: [{ id: "circle-1", name: "새 모임", role: "admin" }],
       error: null,
     });
-    const select = jest.fn().mockReturnValue({ single });
-    const circleInsert = jest.fn().mockReturnValue({ select });
-    const memberInsert = jest.fn().mockResolvedValue({ error: null });
 
-    (supabase.from as jest.Mock).mockImplementation((table: string) => {
-      if (table === "circles") {
-        return { insert: circleInsert };
-      }
-      if (table === "circle_members") {
-        return { insert: memberInsert };
-      }
-      return {};
-    });
+    const created = await createCircleWithMembership("  새 모임  ");
 
-    const created = await createCircleWithMembership("  새 모임  ", "user-1");
-
-    expect(circleInsert).toHaveBeenCalledWith({
-      name: "새 모임",
-      created_by: "user-1",
-    });
-    expect(memberInsert).toHaveBeenCalledWith({
-      circle_id: "circle-1",
-      user_id: "user-1",
-      role: "admin",
+    expect(supabase.rpc).toHaveBeenCalledWith("create_circle_with_membership", {
+      p_name: "새 모임",
     });
     expect(created).toEqual({ id: "circle-1", name: "새 모임", role: "admin" });
   });
 
   it("rejects blank circle names", async () => {
-    await expect(createCircleWithMembership("   ", "user-1")).rejects.toEqual(
+    await expect(createCircleWithMembership("   ")).rejects.toEqual(
       expect.objectContaining({ message: "모임 이름을 입력해 주세요." }),
     );
   });

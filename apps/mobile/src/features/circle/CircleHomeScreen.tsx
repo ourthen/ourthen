@@ -136,7 +136,7 @@ export function CircleHomeScreen({
     try {
       setIsSaving(true);
       setErrorMessage("");
-      const created = await service.createCircleWithMembership(circleName, userId);
+      const created = await service.createCircleWithMembership(circleName);
       setCircleName("");
       setCircles((prev) => [created, ...prev]);
       setSelectedCircleId(created.id);

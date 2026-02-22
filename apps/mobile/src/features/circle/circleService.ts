@@ -52,40 +52,31 @@ export function mapCircleRows(rows: RawCircleRow[]): CircleSummary[] {
 
 export async function createCircleWithMembership(
   name: string,
-  userId: string,
 ): Promise<CircleSummary> {
   const trimmedName = name.trim();
   if (!trimmedName) {
     throw new Error("모임 이름을 입력해 주세요.");
   }
 
-  const { data: circle, error: circleError } = await supabase
-    .from("circles")
-    .insert({
-      name: trimmedName,
-      created_by: userId,
-    })
-    .select("id, name")
-    .single();
-
-  if (circleError) {
-    throw circleError;
-  }
-
-  const { error: membershipError } = await supabase.from("circle_members").insert({
-    circle_id: circle.id,
-    user_id: userId,
-    role: "admin",
+  const { data, error } = await supabase.rpc("create_circle_with_membership", {
+    p_name: trimmedName,
   });
 
-  if (membershipError) {
-    throw membershipError;
+  if (error) {
+    throw error;
   }
 
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== "object" || !("id" in row) || !("name" in row)) {
+    throw new Error("모임 생성 결과를 확인할 수 없어요.");
+  }
+
+  const role = (row as { role?: unknown }).role === "member" ? "member" : "admin";
+
   return {
-    id: circle.id,
-    name: circle.name,
-    role: "admin",
+    id: String((row as { id: unknown }).id),
+    name: String((row as { name: unknown }).name),
+    role,
   };
 }
 
