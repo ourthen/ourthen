@@ -61,7 +61,6 @@ type BusyAction =
 
 type HomeView =
   | "feed"
-  | "menu"
   | "members"
   | "create_circle"
   | "join_circle"
@@ -69,6 +68,16 @@ type HomeView =
   | "meetup"
   | "meetup_create"
   | "invite";
+
+type RootView = "feed" | "members" | "pieces" | "meetup" | "invite";
+
+const ROOT_TABS: Array<{ key: RootView; label: string }> = [
+  { key: "feed", label: "피드" },
+  { key: "members", label: "모임" },
+  { key: "pieces", label: "기억" },
+  { key: "meetup", label: "일정" },
+  { key: "invite", label: "초대" },
+];
 
 function normalizeInviteCode(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
@@ -204,18 +213,16 @@ export function CircleHomeScreen({
     switch (activeView) {
       case "feed":
         return `${selectedCircle.name} 피드`;
-      case "menu":
-        return "기능 선택";
       case "members":
-        return "모임 관리";
+        return "모임";
       case "create_circle":
         return "모임 만들기";
       case "join_circle":
         return "코드로 참여";
       case "pieces":
-        return "기억 남기기";
+        return "기억";
       case "meetup":
-        return "모임 일정";
+        return "일정";
       case "meetup_create":
         return "일정 만들기";
       case "invite":
@@ -224,6 +231,24 @@ export function CircleHomeScreen({
         return "우리그때";
     }
   }, [activeView, selectedCircle]);
+  const activeRootView: RootView = useMemo(() => {
+    if (activeView === "create_circle" || activeView === "join_circle") {
+      return "members";
+    }
+    if (activeView === "meetup_create") {
+      return "meetup";
+    }
+    return activeView;
+  }, [activeView]);
+  const subViewBackTarget = useMemo<HomeView | null>(() => {
+    if (activeView === "create_circle" || activeView === "join_circle") {
+      return "members";
+    }
+    if (activeView === "meetup_create") {
+      return "meetup";
+    }
+    return null;
+  }, [activeView]);
 
   const loadCircleContent = useCallback(
     async (circleId: string) => {
@@ -588,37 +613,39 @@ export function CircleHomeScreen({
   };
 
   return (
-    <ScrollView
-      contentContainerStyle={[
-        styles.scrollContent,
-        {
-          paddingHorizontal: layout.horizontalPadding,
-        },
-      ]}
-      keyboardDismissMode="on-drag"
-      keyboardShouldPersistTaps="handled"
-      onScrollBeginDrag={Keyboard.dismiss}
-      refreshControl={
-        <RefreshControl
-          onRefresh={() => {
-            void handleRefresh();
-          }}
-          refreshing={isRefreshing}
-          tintColor={colors.primary}
-        />
-      }
-    >
-      <View style={[styles.content, { maxWidth: layout.contentMaxWidth }]}>
+    <View style={styles.screenRoot}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingBottom: selectedCircle ? 94 : 28,
+            paddingHorizontal: layout.horizontalPadding,
+          },
+        ]}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={Keyboard.dismiss}
+        refreshControl={
+          <RefreshControl
+            onRefresh={() => {
+              void handleRefresh();
+            }}
+            refreshing={isRefreshing}
+            tintColor={colors.primary}
+          />
+        }
+      >
+        <View style={[styles.content, { maxWidth: layout.contentMaxWidth }]}>
         <View style={styles.heroCard}>
           <View style={styles.heroTopRow}>
             <Text style={styles.heroTitle}>{viewTitle}</Text>
             <View style={styles.heroActionRow}>
-              {selectedCircle && activeView !== "feed" ? (
+              {subViewBackTarget ? (
                 <Pressable
                   accessibilityRole="button"
                   disabled={isBusy}
                   onPress={() => {
-                    setActiveView("feed");
+                    setActiveView(subViewBackTarget);
                   }}
                   style={({ pressed }) => [
                     styles.refreshButton,
@@ -626,23 +653,7 @@ export function CircleHomeScreen({
                     pressed && !isBusy && styles.refreshButtonPressed,
                   ]}
                 >
-                  <Text style={styles.refreshButtonText}>피드</Text>
-                </Pressable>
-              ) : null}
-              {selectedCircle && activeView !== "menu" ? (
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={isBusy}
-                  onPress={() => {
-                    setActiveView("menu");
-                  }}
-                  style={({ pressed }) => [
-                    styles.refreshButton,
-                    isBusy && styles.refreshButtonDisabled,
-                    pressed && !isBusy && styles.refreshButtonPressed,
-                  ]}
-                >
-                  <Text style={styles.refreshButtonText}>메뉴</Text>
+                  <Text style={styles.refreshButtonText}>뒤로</Text>
                 </Pressable>
               ) : null}
               <Pressable
@@ -802,85 +813,6 @@ export function CircleHomeScreen({
               <FeedScreen circleId={selectedCircle.id} refreshToken={feedRefreshToken} />
             ) : null}
 
-            {activeView === "menu" ? (
-              <View style={styles.sectionCard}>
-                <Text style={styles.sectionLabel}>기능 선택</Text>
-                <Text style={styles.mutedText}>한 화면에서 한 작업만 하도록 구성했어요.</Text>
-                <View style={styles.menuGrid}>
-                  <Pressable
-                    onPress={() => setActiveView("members")}
-                    style={({ pressed }) => [
-                      styles.menuButton,
-                      pressed && styles.menuButtonPressed,
-                    ]}
-                  >
-                    <Text style={styles.menuButtonTitle}>모임 관리</Text>
-                    <Text style={styles.menuButtonCaption}>모임 선택·멤버 확인</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setActiveView("create_circle")}
-                    style={({ pressed }) => [
-                      styles.menuButton,
-                      pressed && styles.menuButtonPressed,
-                    ]}
-                  >
-                    <Text style={styles.menuButtonTitle}>모임 만들기</Text>
-                    <Text style={styles.menuButtonCaption}>새 모임 생성</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setActiveView("join_circle")}
-                    style={({ pressed }) => [
-                      styles.menuButton,
-                      pressed && styles.menuButtonPressed,
-                    ]}
-                  >
-                    <Text style={styles.menuButtonTitle}>코드로 참여</Text>
-                    <Text style={styles.menuButtonCaption}>초대 코드 입력</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setActiveView("pieces")}
-                    style={({ pressed }) => [
-                      styles.menuButton,
-                      pressed && styles.menuButtonPressed,
-                    ]}
-                  >
-                    <Text style={styles.menuButtonTitle}>기억 남기기</Text>
-                    <Text style={styles.menuButtonCaption}>텍스트 조각 작성</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setActiveView("meetup")}
-                    style={({ pressed }) => [
-                      styles.menuButton,
-                      pressed && styles.menuButtonPressed,
-                    ]}
-                  >
-                    <Text style={styles.menuButtonTitle}>일정 보기</Text>
-                    <Text style={styles.menuButtonCaption}>다가오는 모임 확인</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setActiveView("meetup_create")}
-                    style={({ pressed }) => [
-                      styles.menuButton,
-                      pressed && styles.menuButtonPressed,
-                    ]}
-                  >
-                    <Text style={styles.menuButtonTitle}>일정 만들기</Text>
-                    <Text style={styles.menuButtonCaption}>제목·날짜·시간 입력</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setActiveView("invite")}
-                    style={({ pressed }) => [
-                      styles.menuButton,
-                      pressed && styles.menuButtonPressed,
-                    ]}
-                  >
-                    <Text style={styles.menuButtonTitle}>초대 코드</Text>
-                    <Text style={styles.menuButtonCaption}>코드 발급·공유</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ) : null}
-
             {activeView === "members" ? (
               <>
                 <View style={styles.sectionCard}>
@@ -922,6 +854,28 @@ export function CircleHomeScreen({
                         </Text>
                       </Pressable>
                     ))}
+                  </View>
+                  <View style={styles.memberActionRow}>
+                    <Pressable
+                      onPress={() => setActiveView("create_circle")}
+                      style={({ pressed }) => [
+                        styles.secondaryButton,
+                        styles.memberActionButton,
+                        pressed && styles.secondaryButtonPressed,
+                      ]}
+                    >
+                      <Text style={styles.secondaryButtonText}>모임 만들기</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setActiveView("join_circle")}
+                      style={({ pressed }) => [
+                        styles.secondaryButton,
+                        styles.memberActionButton,
+                        pressed && styles.secondaryButtonPressed,
+                      ]}
+                    >
+                      <Text style={styles.secondaryButtonText}>코드 참여</Text>
+                    </Pressable>
                   </View>
                 </View>
 
@@ -1299,12 +1253,41 @@ export function CircleHomeScreen({
             </Pressable>
           </View>
         ) : null}
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
+      {!isLoading && selectedCircle ? (
+        <View style={styles.bottomNav}>
+          {ROOT_TABS.map((tab) => (
+            <Pressable
+              key={tab.key}
+              accessibilityRole="button"
+              onPress={() => setActiveView(tab.key)}
+              style={({ pressed }) => [
+                styles.bottomNavItem,
+                activeRootView === tab.key && styles.bottomNavItemActive,
+                pressed && styles.bottomNavItemPressed,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.bottomNavItemText,
+                  activeRootView === tab.key && styles.bottomNavItemTextActive,
+                ]}
+              >
+                {tab.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screenRoot: {
+    flex: 1,
+  },
   scrollContent: {
     alignItems: "center",
     paddingBottom: 28,
@@ -1589,29 +1572,12 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
   },
-  menuGrid: {
+  memberActionRow: {
+    flexDirection: "row",
     gap: 8,
   },
-  menuButton: {
-    backgroundColor: colors.surfaceMuted,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  menuButtonPressed: {
-    opacity: 0.75,
-  },
-  menuButtonTitle: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  menuButtonCaption: {
-    color: colors.textSecondary,
-    fontSize: 12,
+  memberActionButton: {
+    flex: 1,
   },
   meetupList: {
     gap: 12,
@@ -1728,5 +1694,38 @@ const styles = StyleSheet.create({
     color: colors.danger,
     fontSize: 12,
     fontWeight: "700",
+  },
+  bottomNav: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    paddingBottom: 20,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+  },
+  bottomNavItem: {
+    alignItems: "center",
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    flex: 1,
+    paddingVertical: 10,
+  },
+  bottomNavItemPressed: {
+    opacity: 0.75,
+  },
+  bottomNavItemActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  bottomNavItemText: {
+    color: colors.textPrimary,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  bottomNavItemTextActive: {
+    color: "#fff",
   },
 });

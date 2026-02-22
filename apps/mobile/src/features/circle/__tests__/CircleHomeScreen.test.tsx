@@ -66,8 +66,7 @@ describe("CircleHomeScreen", () => {
       expect(screen.getByText("피드:c1")).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText("메뉴"));
-    fireEvent.press(screen.getByText("일정 보기"));
+    fireEvent.press(screen.getByText("일정"));
 
     await waitFor(() => {
       expect(screen.getByText("다가오는 모임 · 우리 모임")).toBeTruthy();
@@ -145,8 +144,7 @@ describe("CircleHomeScreen", () => {
       expect(screen.getByText("피드:c1")).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText("메뉴"));
-    fireEvent.press(screen.getByText("초대 코드"));
+    fireEvent.press(screen.getByText("초대"));
 
     await waitFor(() => {
       expect(screen.getByText("현재 계정은 멤버 권한이라 초대 코드를 만들 수 없어요.")).toBeTruthy();
@@ -205,8 +203,7 @@ describe("CircleHomeScreen", () => {
       expect(screen.getByText("피드:c1")).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText("메뉴"));
-    fireEvent.press(screen.getByText("초대 코드"));
+    fireEvent.press(screen.getByText("초대"));
 
     await waitFor(() => {
       expect(service.fetchLatestCircleInviteCode).toHaveBeenCalledWith("c1");
@@ -231,8 +228,7 @@ describe("CircleHomeScreen", () => {
       expect(screen.getByText("피드:c1")).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText("메뉴"));
-    fireEvent.press(screen.getByText("초대 코드"));
+    fireEvent.press(screen.getByText("초대"));
 
     await waitFor(() => {
       expect(screen.getByText("새 코드 다시 발급")).toBeTruthy();
@@ -291,15 +287,13 @@ describe("CircleHomeScreen", () => {
       expect(screen.getByText("피드:c1")).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText("메뉴"));
-    fireEvent.press(screen.getByText("기억 남기기"));
+    fireEvent.press(screen.getByText("기억"));
 
     await waitFor(() => {
       expect(screen.getByText("기억 조각 추가 · 우리 모임")).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText("메뉴"));
-    fireEvent.press(screen.getByText("초대 코드"));
+    fireEvent.press(screen.getByText("초대"));
 
     await waitFor(() => {
       expect(screen.getByText("초대 코드 발급하기")).toBeTruthy();
