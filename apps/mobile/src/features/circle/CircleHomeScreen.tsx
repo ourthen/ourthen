@@ -56,6 +56,18 @@ type BusyAction =
   | "create_meetup"
   | "create_piece";
 
+function normalizeInviteCode(input: string): string {
+  return input.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+}
+
+function formatInviteCode(input: string): string {
+  const normalized = normalizeInviteCode(input);
+  if (normalized.length <= 4) {
+    return normalized;
+  }
+  return `${normalized.slice(0, 4)}-${normalized.slice(4)}`;
+}
+
 function messageFromError(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -259,7 +271,7 @@ export function CircleHomeScreen({
       setErrorMessage("");
       setSuccessMessage("");
       const result = await Share.share({
-        message: `[우리그때] ${selectedCircle.name} 초대 코드: ${inviteCode}\n앱에서 코드로 참여해 주세요.`,
+        message: `[우리그때] ${selectedCircle.name} 초대 코드: ${formatInviteCode(inviteCode)}\n앱에서 코드로 참여해 주세요.`,
       });
       if (result.action === Share.sharedAction) {
         setSuccessMessage("초대 코드를 공유했어요.");
@@ -515,11 +527,13 @@ export function CircleHomeScreen({
               <>
                 <TextInput
                   autoCapitalize="characters"
-                  onChangeText={setJoinCode}
-                  placeholder="참여 코드 입력"
+                  onChangeText={(next) => {
+                    setJoinCode(normalizeInviteCode(next));
+                  }}
+                  placeholder="참여 코드 입력 (예: ABCD-1234)"
                   placeholderTextColor={colors.textSecondary}
                   style={styles.input}
-                  value={joinCode}
+                  value={formatInviteCode(joinCode)}
                 />
                 <Pressable
                   disabled={isBusy || joinCode.trim().length === 0}
@@ -590,7 +604,9 @@ export function CircleHomeScreen({
               </Text>
               {selectedCircle.role === "admin" ? (
                 <>
-                  {inviteCode ? <Text style={styles.inviteCodeText}>{inviteCode}</Text> : null}
+                  {inviteCode ? (
+                    <Text style={styles.inviteCodeText}>{formatInviteCode(inviteCode)}</Text>
+                  ) : null}
                   <Pressable
                     disabled={isBusy}
                     onPress={handleCreateInviteCode}
@@ -625,11 +641,13 @@ export function CircleHomeScreen({
               )}
               <TextInput
                 autoCapitalize="characters"
-                onChangeText={setJoinCode}
-                placeholder="참여 코드 입력"
+                onChangeText={(next) => {
+                  setJoinCode(normalizeInviteCode(next));
+                }}
+                placeholder="참여 코드 입력 (예: ABCD-1234)"
                 placeholderTextColor={colors.textSecondary}
                 style={styles.input}
-                value={joinCode}
+                value={formatInviteCode(joinCode)}
               />
               <Pressable
                 disabled={isBusy || joinCode.trim().length === 0}

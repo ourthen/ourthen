@@ -79,11 +79,14 @@ describe("CircleHomeScreen", () => {
     });
 
     fireEvent.press(screen.getByText("코드 참여"));
-    fireEvent.changeText(screen.getByPlaceholderText("참여 코드 입력"), "abcd-1234");
+    fireEvent.changeText(
+      screen.getByPlaceholderText("참여 코드 입력 (예: ABCD-1234)"),
+      "abcd-1234",
+    );
     fireEvent.press(screen.getByText("코드로 참여하기"));
 
     await waitFor(() => {
-      expect(service.joinCircleByInviteCode).toHaveBeenCalledWith("abcd-1234");
+      expect(service.joinCircleByInviteCode).toHaveBeenCalledWith("ABCD1234");
       expect(service.fetchMeetupsByCircle).toHaveBeenCalledWith("c2");
       expect(service.fetchPiecesByCircle).toHaveBeenCalledWith("c2");
       expect(screen.getAllByText("우리 동네 팀").length).toBeGreaterThan(0);
@@ -118,7 +121,7 @@ describe("CircleHomeScreen", () => {
 
     await waitFor(() => {
       expect(service.fetchLatestCircleInviteCode).toHaveBeenCalledWith("c1");
-      expect(screen.getByText("ZXCV1234")).toBeTruthy();
+      expect(screen.getByText("ZXCV-1234")).toBeTruthy();
     });
   });
 
